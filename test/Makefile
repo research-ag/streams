@@ -1,7 +1,9 @@
 MOPS_PKGS=$(shell mops sources)
 
-all: <package>
+all: StreamSender StreamReceiver
 
-<package>:
-	moc $(MOPS_PKGS) -wasi-system-api <package>.mo && wasmtime <package>.wasm
+StreamSender:
+	moc $(MOPS_PKGS) -wasi-system-api StreamSender.mo && wasmtime StreamSender.wasm
 
+StreamReceiver:
+	moc $(MOPS_PKGS) -wasi-system-api StreamReceiver.mo && wasmtime StreamReceiver.wasm

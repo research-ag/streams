@@ -1,13 +1,14 @@
 [package]
-name = ""
+name = "streams"
 version = "0.0.1"
-description = ""
-repository = "https://github.com/research-ag/..."
-keywords = [ ]
+description = "Stream sender and receiver libraries"
+repository = "https://github.com/research-ag/streams"
+keywords = [ "stream sender", "stream receiver", "streams" ]
 license = "Apache-2.0"
 
 [dependencies]
-base = "0.9.3"
+base = "0.10.2"
+swb = "1.0.0"
 
 [dev-dependencies]
-test = "1.0.1"
+test = "1.1.0"
