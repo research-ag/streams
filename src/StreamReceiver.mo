@@ -31,11 +31,10 @@ module {
     // itemCallback is custom made per-stream and contains the streamId
   ) {
 
-    var expectedNextIndex_ : Nat = startIndex;
-    // rename to length_?
+    var length_ : Nat = startIndex;
     var lastChunkReceived_ : Time.Time = Time.now();
 
-    public func length() : Nat = expectedNextIndex_;
+    public func length() : Nat = length_;
 
     let timeout : ?Nat = switch (timeoutSeconds) {
       case (?s) ?(s * 1_000_000_000);
@@ -55,7 +54,7 @@ module {
     // This function is async* so that can throw an Error.
     // It does not make any subsequent calls.
     public func onChunk(chunk : [T], firstIndex : Nat) : async* Bool {
-      if (firstIndex != expectedNextIndex_) {
+      if (firstIndex != length_) {
         throw Error.reject("Broken pipe in StreamReceiver");
       };
       if (isClosed()) return false;
@@ -63,15 +62,15 @@ module {
       for (i in chunk.keys()) {
         itemCallback(chunk[i], firstIndex + i);
       };
-      expectedNextIndex_ := firstIndex + chunk.size();
+      length_ := firstIndex + chunk.size();
       return true;
     };
 
     // should be used only in internal streams
     public func insertItem(item : T) : Nat {
-      itemCallback(item, expectedNextIndex_);
-      expectedNextIndex_ += 1;
-      expectedNextIndex_ - 1;
+      itemCallback(item, length_);
+      length_ += 1;
+      length_ - 1;
     };
   };
 };

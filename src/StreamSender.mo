@@ -3,6 +3,7 @@ import Error "mo:base/Error";
 import R "mo:base/Result";
 import Time "mo:base/Time";
 import Array "mo:base/Array";
+import Option "mo:base/Option";
 import SWB "mo:swb";
 
 module {
@@ -24,35 +25,59 @@ module {
   /// await* sender.sendChunk(); // will send (123, [11..12], 10) to `anotherCanister`
   /// await* sender.sendChunk(); // will do nothing, stream clean
   public class StreamSender<T, S>(
-    // Do we need it?
-    maxQueueSize : ?Nat,
-    counter : { accept(item : T) : Bool; reset() : () },
+    counterCreator : () -> { accept(item : T) : Bool },
     wrapItem : T -> S,
-    maxConcurrentChunks : Nat,
-    keepAliveSeconds : Nat,
     sendFunc : (items : [S], firstIndex : Nat) -> async* Bool,
-    // TODO Did we already change this to async* in deployment?
+    settings : {
+      maxQueueSize : ?Nat;
+      maxConcurrentChunks : ?Nat;
+      keepAliveSeconds : ?Nat;
+    },
   ) {
-    var closed : Bool = false;
-    let queue = object {
-      public let buf = SWB.SlidingWindowBuffer<T>();
-      var head_ : Nat = 0;
-      public func head() : Nat = head_;
+    let MAX_CONCURRENT_CHUNKS_DEFAULT = 5;
 
-      func pop() : T {
-        let ?x = buf.getOpt(head_) else Debug.trap("queue empty in pop()");
-        head_ += 1;
-        x;
+    let buffer = SWB.SlidingWindowBuffer<T>();
+    
+    let settings_ = {
+      var maxQueueSize = settings.maxQueueSize;
+      var maxConcurrentChunks = settings.maxConcurrentChunks;
+      var keepAliveSeconds = settings.keepAliveSeconds;
+    };
+
+    var closed = false;
+    var paused = false;
+    var head = 0;
+    var lastChunkSent = Time.now();
+    var concurrentChunks = 0;
+
+    /// add item to the stream
+    public func add(item : T) : {
+      #ok : Nat;
+      #err : { #NoSpace };
+    } {
+      switch (settings_.maxQueueSize) {
+        case (?max) {
+          if (buffer.len() >= max) {
+            return #err(#NoSpace);
+          };
+        };
+        case (null) {};
       };
+      #ok(buffer.add(item));
+    };
 
-      public func rewind() { head_ := buf.start() };
-      public func size() : Nat { buf.end() - head_ : Nat };
-      public func chunk() : (Nat, Nat, [S]) {
-        var start = head_;
+    /// send chunk to the receiver
+    public func sendChunk() : async* () {
+      if (isClosed()) Debug.trap("Stream closed");
+      if (isBusy()) Debug.trap("Stream sender is busy");
+      if (isPaused()) Debug.trap("Stream sender is paused");
+
+      func chunk() : (Nat, Nat, [S]) {
+        var start = head;
         var end = start;
-        counter.reset();
+        let counter = counterCreator();
         label peekLoop while (true) {
-          switch (buf.getOpt(end)) {
+          switch (buffer.getOpt(end)) {
             case (null) break peekLoop;
             case (?item) {
               if (not counter.accept(item)) break peekLoop;
@@ -60,109 +85,92 @@ module {
             };
           };
         };
+        func pop() : T {
+          let ?x = buffer.getOpt(head) else Debug.trap("queue empty in pop()");
+          head += 1;
+          x;
+        };
         let elements = Array.tabulate<S>(end - start, func(n) = wrapItem(pop()));
         (start, end, elements);
+      };
+
+      let (start, end, elements) = chunk();
+
+      func shouldPing() : Bool {
+        switch (settings_.keepAliveSeconds) {
+          case (?i) lastChunkSent + i * 1_000_000_000 < Time.now();
+          case (null) false;
+        };
+      };
+
+      if (start == end and not shouldPing()) return;
+
+      func receive() {
+        concurrentChunks -= 1;
+        if (concurrentChunks == 0 and paused) {
+          head := buffer.start();
+          paused := false;
+        };
+      };
+
+      lastChunkSent := Time.now();
+      concurrentChunks += 1;
+
+      let success = try {
+        await* sendFunc(elements, start);
+      } catch (e) {
+        paused := true;
+        receive();
+        throw e;
+      };
+
+      buffer.deleteTo(if success { end } else { start });
+      receive();
+
+      if (not success) {
+        closed := true;
       };
     };
 
     /// total amount of items, ever added to the stream sender, also an index, which will be assigned to the next item
-    public func length() : Nat = queue.buf.end();
+    public func length() : Nat = buffer.end();
+
     /// amount of items, which were sent to receiver
-    public func sent() : Nat = queue.head();
+    public func sent() : Nat = head;
+
     /// amount of items, successfully sent and acknowledged by receiver
-    public func received() : Nat = queue.buf.start();
+    public func received() : Nat = buffer.start();
 
     /// get item from queue by index
-    public func get(index : Nat) : ?T = queue.buf.getOpt(index);
+    public func get(index : Nat) : ?T = buffer.getOpt(index);
 
     /// check busy status of sender
-    public func isBusy() : Bool = window.isBusy();
+    public func isBusy() : Bool {
+      concurrentChunks == Option.get(settings_.maxConcurrentChunks, MAX_CONCURRENT_CHUNKS_DEFAULT);
+    };
 
     /// check busy level of sender, e.g. current amount of outgoing calls in flight
-    public func busyLevel() : Nat = window.size();
+    public func busyLevel() : Nat = concurrentChunks;
 
     /// returns flag is receiver closed the stream
     public func isClosed() : Bool = closed;
 
     /// check paused status of sender
-    public func isPaused() : Bool = window.hasError();
+    public func isPaused() : Bool = paused;
+
+    /// update max queue size
+    public func setMaxQueueSize(value : ?Nat) {
+      settings_.maxQueueSize := value;
+    };
 
     /// update max amount of concurrent outgoing requests
-    public func setMaxConcurrentChunks(value : Nat) = window.maxSize := value;
+    public func setMaxConcurrentChunks(value : ?Nat) {
+      settings_.maxConcurrentChunks := value;
+    };
 
-    var keepAliveInterval : Nat = keepAliveSeconds * 1_000_000_000;
     /// update max interval between stream calls
-    public func setKeepAlive(seconds : Nat) {
-      keepAliveInterval := seconds * 1_000_000_000;
-    };
-
-    /// add item to the stream
-    public func add(item : T) : { #ok : Nat; #err : { #NoSpace } } {
-      switch (maxQueueSize) {
-        case (?max) if (queue.buf.len() >= max) {
-          return #err(#NoSpace);
-        };
-        case (_) {};
-      };
-      #ok(queue.buf.add(item));
-    };
-
-    // The receive window of the sliding window protocol
-    let window = object {
-      public var maxSize = maxConcurrentChunks;
-      public var lastChunkSent = Time.now();
-      var size_ = 0;
-      var error_ = false;
-
-      func isClosed() : Bool { size_ == 0 }; // if window is closed (not stream)
-      public func hasError() : Bool { error_ };
-      public func isBusy() : Bool { size_ == maxSize };
-      public func size() : Nat = size_;
-      public func send() {
-        lastChunkSent := Time.now();
-        size_ += 1;
-      };
-      public func receive(msg : { #ok : Nat; #err }) {
-        switch (msg) {
-          case (#ok(pos)) queue.buf.deleteTo(pos);
-          case (#err) error_ := true;
-        };
-        size_ -= 1;
-        if (isClosed() and error_) {
-          queue.rewind();
-          error_ := false;
-        };
-      };
-    };
-
-    func nothingToSend(start : Nat, end : Nat) : Bool {
-      // skip sending empty chunk unless keep-alive is due
-      start == end and Time.now() < window.lastChunkSent + keepAliveInterval
-    };
-
-    /// send chunk to the receiver
-    public func sendChunk() : async* () {
-      if (closed) Debug.trap("Stream closed");
-      if (window.isBusy()) Debug.trap("Stream sender is busy");
-      if (window.hasError()) Debug.trap("Stream sender is paused");
-      let (start, end, elements) = queue.chunk();
-      if (nothingToSend(start, end)) return;
-      window.send();
-      try {
-        switch (await* sendFunc(elements, start)) {
-          case (true) window.receive(#ok(end));
-          case (false) {
-            // This response came from the first batch after the stream's
-            // closing position, hence `start` is exactly the final length of
-            // the stream.
-            window.receive(#ok(start));
-            closed := true;
-          };
-        };
-      } catch (e) {
-        window.receive(#err);
-        throw e;
-      };
+    public func setKeepAlive(seconds : ?Nat) {
+      settings_.keepAliveSeconds := seconds;
     };
   };
 };
