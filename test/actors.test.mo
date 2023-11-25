@@ -13,6 +13,8 @@ actor class A(r : Receiver) {
   class counter() {
     var sum = 0;
     public func accept(item : Text) : Bool {
+      // the wrap function replaces too large items with null
+      if (item.size() > MAX_LENGTH) return true;
       sum += item.size();
       sum <= MAX_LENGTH;
     };
@@ -86,11 +88,12 @@ await a.trigger();
 assert ((await b.nReceived()) == 2);
 await a.trigger();
 assert ((await b.nReceived()) == 3);
-await a.trigger(); // 6 chars won't go through
-assert ((await b.nReceived()) == 3);
-await a.trigger(); // sender will be stuck, the 6 char item will never be popped
-assert ((await b.nReceived()) == 3);
+await a.trigger(); // 6 char item will be skipped
+assert ((await b.nReceived()) == 4);
+await a.trigger(); // no new items
+assert ((await b.nReceived()) == 4);
 let list = await b.listReceived();
 assert (list[0] == "ab");
 assert (list[1] == "bcd");
 assert (list[2] == "cdefg");
+assert (list[3] == "efg");
