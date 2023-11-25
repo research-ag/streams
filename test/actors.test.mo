@@ -1,25 +1,61 @@
 import StreamReceiver "../src/StreamReceiver";
 import StreamSender "../src/StreamSender";
 import Buffer "mo:base/Buffer";
+import Error "mo:base/Error";
 
 type Receiver = actor { receive : ([?Text], Nat) -> async Bool }; 
 
+// sender actor
 actor class A(r : Receiver) {
-  let index = 0;
-  public func send(t : Text) : async Bool { 
-    await r.receive([?t], index);
+  let MAX_LENGTH = 5;
+
+  class counter() {
+    var sum = 0;
+    public func accept(item : Text) : Bool {
+      sum += item.size();
+      sum <= MAX_LENGTH;
+    }; 
+  };
+
+  func wrap(item : Text) : ?Text {
+    if (item.size() <= MAX_LENGTH) { ?item } else { null };
+  };
+
+  func send(items : [?Text], start : Nat) : async* Bool {
+    await r.receive(items, start);
+  };
+
+  let sender = StreamSender.StreamSender<Text, ?Text>(
+    counter,
+    wrap,
+    send,
+    {
+      maxQueueSize = null;
+      maxConcurrentChunks = null;
+      keepAliveSeconds = null;
+    },
+  );
+
+  public func queue(item : Text) : async { #err : {#NoSpace}; #ok : Nat } {
+    sender.add(item);
+  };
+
+  public func trigger() : async () {
+    await* sender.sendChunk();
   };
 };
 
 actor class B() {
-  let received = Buffer.Buffer<?Text>(0);
+  let received = Buffer.Buffer<Text>(0);
 
   let receiver = StreamReceiver.StreamReceiver<?Text>(
     0,
     null,
     func(item : ?Text, index : Nat) {
-      assert index == received.size();
-      received.add(item);
+      switch (item) {
+        case (?x) received.add(x);
+        case (_) {}
+      };
     },
   );
 
@@ -27,14 +63,31 @@ actor class B() {
     await* receiver.onChunk(items, index);
   };
 
-  public query func listReceived() : async [?Text] {
+  public query func listReceived() : async [Text] {
     Buffer.toArray(received);
-  } 
+  }; 
+  public query func nReceived() : async Nat {
+    received.size();
+  };
 };
 
-let b = await B();
-let a = await A(b);
-assert ((await a.send("abc")) == true);
+let b = await B(); // create receiver B
+let a = await A(b); // create sender A
+assert ((await a.queue("ab")) == #ok 0);
+assert ((await a.queue("bcd")) == #ok 1);
+assert ((await a.queue("cdefg")) == #ok 2);
+assert ((await a.queue("defghi")) == #ok 3);
+assert ((await a.queue("efg")) == #ok 4);
+assert ((await b.nReceived()) == 0);
+await a.trigger();
+assert ((await b.nReceived()) == 2);
+await a.trigger();
+assert ((await b.nReceived()) == 3);
+await a.trigger(); // 6 chars won't go through
+assert ((await b.nReceived()) == 3);
+await a.trigger(); // sender will be stuck, the 6 char item will never be popped
+assert ((await b.nReceived()) == 3);
 let list = await b.listReceived();
-assert (list.size() == 1);
-assert (list[0] == ?"abc");
+assert (list[0] == "ab");
+assert (list[1] == "bcd");
+assert (list[2] == "cdefg");
