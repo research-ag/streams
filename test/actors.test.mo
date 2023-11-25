@@ -2,8 +2,9 @@ import StreamReceiver "../src/StreamReceiver";
 import StreamSender "../src/StreamSender";
 import Buffer "mo:base/Buffer";
 import Error "mo:base/Error";
+import Option "mo:base/Option";
 
-type Receiver = actor { receive : ([?Text], Nat) -> async Bool }; 
+type Receiver = actor { receive : ([?Text], Nat) -> async Bool };
 
 // sender actor
 actor class A(r : Receiver) {
@@ -14,21 +15,21 @@ actor class A(r : Receiver) {
     public func accept(item : Text) : Bool {
       sum += item.size();
       sum <= MAX_LENGTH;
-    }; 
+    };
   };
 
   func wrap(item : Text) : ?Text {
     if (item.size() <= MAX_LENGTH) { ?item } else { null };
   };
 
-  func send(items : [?Text], start : Nat) : async* Bool {
+  func sendToReceiver(items : [?Text], start : Nat) : async* Bool {
     await r.receive(items, start);
   };
 
   let sender = StreamSender.StreamSender<Text, ?Text>(
     counter,
     wrap,
-    send,
+    sendToReceiver,
     {
       maxQueueSize = null;
       maxConcurrentChunks = null;
@@ -36,7 +37,7 @@ actor class A(r : Receiver) {
     },
   );
 
-  public func queue(item : Text) : async { #err : {#NoSpace}; #ok : Nat } {
+  public func queue(item : Text) : async { #err : { #NoSpace }; #ok : Nat } {
     sender.add(item);
   };
 
@@ -46,26 +47,28 @@ actor class A(r : Receiver) {
 };
 
 actor class B() {
+  // processor 
   let received = Buffer.Buffer<Text>(0);
+  func process(item : ?Text, _ : Nat) {
+    Option.iterate<Text>(item, func(x) = received.add(x));
+  };
 
+  // receiver
   let receiver = StreamReceiver.StreamReceiver<?Text>(
     0,
     null,
-    func(item : ?Text, index : Nat) {
-      switch (item) {
-        case (?x) received.add(x);
-        case (_) {}
-      };
-    },
+    process,
   );
 
-  public func receive(items : [?Text], index : Nat) : async Bool { 
+  // pass-through to receiver
+  public func receive(items : [?Text], index : Nat) : async Bool {
     await* receiver.onChunk(items, index);
   };
-
+ 
+  // pass-through to processor
   public query func listReceived() : async [Text] {
     Buffer.toArray(received);
-  }; 
+  };
   public query func nReceived() : async Nat {
     received.size();
   };
