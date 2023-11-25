@@ -18,10 +18,11 @@ jobs:
       - name: Make bin directory
         run: mkdir -p /home/runner/bin
 
-      - name: Install Motoko binaries
+
+      - name: "install Motoko binaries"
         run: |
-          wget https://github.com/dfinity/motoko/releases/download/${{ env.moc_version }}/motoko-linux64-${{ env.moc_version }}.tar.gz
-          tar -xzf motoko-linux64-${{ env.moc_version }}.tar.gz -C /home/runner/bin
+          wget https://github.com/dfinity/motoko/releases/download/${{ env.moc_version }}/motoko-Linux-x86_64-${{ env.moc_version }}.tar.gz
+          tar -xzf motoko-Linux-x86_64-${{ env.moc_version }}.tar.gz -C /home/runner/bin
           echo "/home/runner/bin" >> $GITHUB_PATH
 
       - name: "Install wasmtime"
