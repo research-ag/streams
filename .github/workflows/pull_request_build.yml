@@ -4,8 +4,8 @@ on:
     types: [synchronize, opened, reopened, ready_for_review, unlabeled]
 
 env:
-  mops_version: 0.17.0
-  moc_version: 0.9.3
+  mops_version: latest
+  moc_version: 0.10.2
 
 jobs:
   build:
@@ -24,6 +24,11 @@ jobs:
           tar -xzf motoko-linux64-${{ env.moc_version }}.tar.gz -C /home/runner/bin
           echo "/home/runner/bin" >> $GITHUB_PATH
 
+      - name: "Install wasmtime"
+        run: |
+          curl https://wasmtime.dev/install.sh -sSf | bash
+          echo "/home/runner/.wasmtime/bin" >> $GITHUB_PATH
+
       - name: Install mops
         run: |          
           npm i -g ic-mops@${{ env.mops_version }}
@@ -33,4 +38,3 @@ jobs:
   
       - name: Run test
         run: DFX_MOC_PATH=/home/runner/bin/moc mops test
-
