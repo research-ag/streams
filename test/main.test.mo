@@ -34,7 +34,8 @@ func createSender(receiver : StreamReceiver.StreamReceiver<?Text>) : StreamSende
     if (item.size() <= MAX_LENGTH) { ?item } else { null };
   };
 
-  func send(ch : (Nat, [?Text])) : async* Bool {
+  type ControlMsg = { #stop; #ok }; 
+  func send(ch : (Nat, [?Text])) : async* ControlMsg {
     await* receiver.onChunk(ch);
   };
 

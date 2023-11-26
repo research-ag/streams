@@ -25,6 +25,7 @@ module {
   /// calling code should not catch the throw so that it gets passed through to
   /// the enclosing async expression of the calling code.
   public type Chunk<T> = (Nat, [T]);
+  public type ControlMsg = { #stop; #ok }; 
   public class StreamReceiver<T>(
     startIndex : Nat,
     timeoutSeconds : ?Nat,
@@ -45,8 +46,8 @@ module {
     /// returns timestamp when stream received last chunk
     public func lastChunkReceived() : Time.Time = lastChunkReceived_;
 
-    /// returns flag is receiver closed stream with timeout
-    public func isClosed() : Bool = switch (timeout) {
+    /// returns flag if receiver timed out because of non-activity
+    public func hasTimedOut() : Bool = switch (timeout) {
       case (?to)(Time.now() - lastChunkReceived_) > to;
       case (null) false;
     };
@@ -54,18 +55,18 @@ module {
     /// a function, should be called by shared function or stream manager
     // This function is async* so that can throw an Error.
     // It does not make any subsequent calls.
-    public func onChunk(ch : Chunk<T>) : async* Bool {
+    public func onChunk(ch : Chunk<T>) : async* ControlMsg {
       let (firstIndex, chunk) = ch;
       if (firstIndex != length_) {
         throw Error.reject("Broken pipe in StreamReceiver");
       };
-      if (isClosed()) return false;
+      if (hasTimedOut()) return #stop;
       lastChunkReceived_ := Time.now();
       for (i in chunk.keys()) {
         itemCallback(chunk[i], firstIndex + i);
       };
       length_ := firstIndex + chunk.size();
-      return true;
+      return #ok;
     };
 
     // should be used only in internal streams

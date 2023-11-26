@@ -25,13 +25,14 @@ module {
   /// await* sender.sendChunk(); // will send (123, [11..12], 10) to `anotherCanister`
   /// await* sender.sendChunk(); // will do nothing, stream clean
   public type Chunk<S> = (Nat, [S]);
+  public type ControlMsg = { #stop; #ok }; 
 
   // T = queue item type
   // S = stream item type
   public class StreamSender<T, S>(
     counterCreator : () -> { accept(item : T) : Bool },
     wrapItem : T -> S,
-    sendFunc : (x : Chunk<S>) -> async* Bool,
+    sendFunc : (x : Chunk<S>) -> async* ControlMsg,
     settings : {
       maxQueueSize : ?Nat;
       maxConcurrentChunks : ?Nat;
@@ -48,7 +49,7 @@ module {
       var keepAliveSeconds = settings.keepAliveSeconds;
     };
 
-    var closed = false;
+    var stopped = false;
     var paused = false;
     var head = 0;
     var lastChunkSent = Time.now();
@@ -71,7 +72,7 @@ module {
 
     /// send chunk to the receiver
     public func sendChunk() : async* () {
-      if (isClosed()) Debug.trap("Stream closed");
+      if (isStopped()) Debug.trap("Stream stopped");
       if (isBusy()) Debug.trap("Stream sender is busy");
       if (isPaused()) Debug.trap("Stream sender is paused");
 
@@ -119,7 +120,7 @@ module {
       lastChunkSent := Time.now();
       concurrentChunks += 1;
 
-      let success = try {
+      let response = try {
         let chunk = (start, elements);
         await* sendFunc(chunk);
       } catch (e) {
@@ -128,11 +129,11 @@ module {
         return;
       };
 
-      buffer.deleteTo(if success { end } else { start });
+      buffer.deleteTo(if (response == #ok) end else start);
       receive();
 
-      if (not success) {
-        closed := true;
+      if (response == #stop) {
+        stopped := true;
       };
     };
 
@@ -156,8 +157,8 @@ module {
     /// check busy level of sender, e.g. current amount of outgoing calls in flight
     public func busyLevel() : Nat = concurrentChunks;
 
-    /// returns flag is receiver closed the stream
-    public func isClosed() : Bool = closed;
+    /// returns flag is receiver stopped the stream
+    public func isStopped() : Bool = stopped;
 
     /// check paused status of sender
     public func isPaused() : Bool = paused;
