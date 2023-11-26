@@ -54,15 +54,15 @@ func createSender(receiver : StreamReceiver.StreamReceiver<?Text>) : StreamSende
 let receiver = createReceiver();
 let sender = createSender(receiver);
 
-ignore sender.queue("abc");
-ignore sender.queue("abcdef");
-ignore sender.queue("abc");
-ignore sender.queue("def");
-ignore sender.queue("get");
-ignore sender.queue("nmb");
-ignore sender.queue("abc");
-ignore sender.queue("abc");
-ignore sender.queue("abc");
+ignore sender.push("abc");
+ignore sender.push("abcdef");
+ignore sender.push("abc");
+ignore sender.push("def");
+ignore sender.push("get");
+ignore sender.push("nmb");
+ignore sender.push("abc");
+ignore sender.push("abc");
+ignore sender.push("abc");
 
 await* sender.sendChunk();
 await* sender.sendChunk();

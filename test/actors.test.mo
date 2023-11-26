@@ -49,8 +49,8 @@ actor class Alice(r : ReceiveFunc) {
     },
   );
 
-  public func queue(item : Text) : async { #err : { #NoSpace }; #ok : Nat } {
-    sender.queue(item);
+  public func submit(item : Text) : async { #err : { #NoSpace }; #ok : Nat } {
+    sender.push(item);
   };
 
   public func trigger() : async () {
@@ -97,11 +97,11 @@ actor class Bob() {
 
 let b = await Bob(); // create receiver
 let a = await Alice(b.receive); // create sender
-assert ((await a.queue("ab")) == #ok 0);
-assert ((await a.queue("bcd")) == #ok 1);
-assert ((await a.queue("cdefg")) == #ok 2);
-assert ((await a.queue("defghi")) == #ok 3);
-assert ((await a.queue("efg")) == #ok 4);
+assert ((await a.submit("ab")) == #ok 0);
+assert ((await a.submit("bcd")) == #ok 1);
+assert ((await a.submit("cdefg")) == #ok 2);
+assert ((await a.submit("defghi")) == #ok 3);
+assert ((await a.submit("efg")) == #ok 4);
 assert ((await b.nReceived()) == 0);
 await a.trigger();
 assert ((await b.nReceived()) == 2);

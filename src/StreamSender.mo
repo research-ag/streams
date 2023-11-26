@@ -60,7 +60,7 @@ module {
     };
 
     /// add item to the stream
-    public func queue(item : T) : {
+    public func push(item : T) : {
       #ok : Nat;
       #err : { #NoSpace };
     } {
