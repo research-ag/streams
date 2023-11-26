@@ -68,12 +68,5 @@ module {
       length_ := firstIndex + chunk.size();
       return #ok;
     };
-
-    // should be used only in internal streams
-    public func insertItem(item : T) : Nat {
-      itemCallback(item, length_);
-      length_ += 1;
-      length_ - 1;
-    };
   };
 };
