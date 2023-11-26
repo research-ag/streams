@@ -10,7 +10,7 @@ type ReceiveFunc = shared (Chunk) -> async Bool;
 
 // sender actor
 // argument r is the receiver's shared receive function
-actor class A(r : ReceiveFunc) {
+actor class Alice(r : ReceiveFunc) {
   let MAX_LENGTH = 5;
 
   class counter() {
@@ -59,7 +59,7 @@ actor class A(r : ReceiveFunc) {
 };
 
 // receiver actor
-actor class B() {
+actor class Bob() {
   // processor of received items 
   let received = Buffer.Buffer<Text>(0);
   func processItem(item : ?Text, _ : Nat) {
@@ -76,6 +76,7 @@ actor class B() {
   // required top-level boilerplate code,
   // a pass-through to StreamReceiver
   public func receive(ch : Chunk) : async Bool {
+    if (failOn) throw Error.reject("failOn");
     await* receiver.onChunk(ch);
   };
  
@@ -86,10 +87,16 @@ actor class B() {
   public query func nReceived() : async Nat {
     received.size();
   };
+
+  // simulate Errors
+  var failOn = false;
+  public func setFailOn(b : Bool) {
+    failOn := b;
+  };
 };
 
-let b = await B(); // create receiver B
-let a = await A(b.receive); // create sender A
+let b = await Bob(); // create receiver
+let a = await Alice(b.receive); // create sender
 assert ((await a.queue("ab")) == #ok 0);
 assert ((await a.queue("bcd")) == #ok 1);
 assert ((await a.queue("cdefg")) == #ok 2);
@@ -98,11 +105,16 @@ assert ((await a.queue("efg")) == #ok 4);
 assert ((await b.nReceived()) == 0);
 await a.trigger();
 assert ((await b.nReceived()) == 2);
-await a.trigger();
+b.setFailOn(true);
+await a.trigger(); // chunk will fail
+await a.trigger(); // chunk will fail
+assert ((await b.nReceived()) == 2);
+b.setFailOn(false);
+await a.trigger(); // chunk will succeed
 assert ((await b.nReceived()) == 3);
-await a.trigger(); // 6 char item will be skipped
+await a.trigger(); // 6-char item will be skipped
 assert ((await b.nReceived()) == 4);
-await a.trigger(); // no new items
+await a.trigger(); // no items left
 assert ((await b.nReceived()) == 4);
 let list = await b.listReceived();
 assert (list[0] == "ab");

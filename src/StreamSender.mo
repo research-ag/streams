@@ -125,7 +125,7 @@ module {
       } catch (e) {
         paused := true;
         receive();
-        throw e;
+        return;
       };
 
       buffer.deleteTo(if success { end } else { start });
