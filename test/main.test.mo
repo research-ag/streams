@@ -34,8 +34,8 @@ func createSender(receiver : StreamReceiver.StreamReceiver<?Text>) : StreamSende
     if (item.size() <= MAX_LENGTH) { ?item } else { null };
   };
 
-  func send(items : [?Text], start : Nat) : async* Bool {
-    await async await* receiver.onChunk(items, start);
+  func send(ch : (Nat, [?Text])) : async* Bool {
+    await* receiver.onChunk(ch);
   };
 
   let sender = StreamSender.StreamSender<Text, ?Text>(

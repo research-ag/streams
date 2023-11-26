@@ -4,10 +4,13 @@ import Buffer "mo:base/Buffer";
 import Error "mo:base/Error";
 import Option "mo:base/Option";
 
-type Receiver = actor { receive : ([?Text], Nat) -> async Bool };
+type Chunk = StreamSender.Chunk<?Text>;
+// or type Chunk = StreamReceiver.Chunk<?Text>;
+type ReceiveFunc = shared (Chunk) -> async Bool;
 
 // sender actor
-actor class A(r : Receiver) {
+// argument r is the receiver's shared receive function
+actor class A(r : ReceiveFunc) {
   let MAX_LENGTH = 5;
 
   class counter() {
@@ -24,8 +27,14 @@ actor class A(r : Receiver) {
     if (item.size() <= MAX_LENGTH) { ?item } else { null };
   };
 
-  func sendToReceiver(items : [?Text], start : Nat) : async* Bool {
-    await r.receive(items, start);
+  // Wrap the receiver's shared function.
+  // This must always be done because we need to turn the receiver's shared
+  // function into an async* return type.
+  // We can place additional code here, for example, for logging.
+  // However, we must not catch and convert any Errors. The Errors from
+  // `await r` must be passed through unaltered or the StreamSender may break. 
+  func sendToReceiver(ch : Chunk) : async* Bool {
+    await r(ch);
   };
 
   let sender = StreamSender.StreamSender<Text, ?Text>(
@@ -48,26 +57,28 @@ actor class A(r : Receiver) {
   };
 };
 
+// receiver actor
 actor class B() {
-  // processor 
+  // processor of received items 
   let received = Buffer.Buffer<Text>(0);
-  func process(item : ?Text, _ : Nat) {
+  func processItem(item : ?Text, _ : Nat) {
     Option.iterate<Text>(item, func(x) = received.add(x));
   };
 
-  // receiver
+  // StreamReceiver
   let receiver = StreamReceiver.StreamReceiver<?Text>(
     0,
     null,
-    process,
+    processItem,
   );
 
-  // pass-through to receiver
-  public func receive(items : [?Text], index : Nat) : async Bool {
-    await* receiver.onChunk(items, index);
+  // required top-level boilerplate code,
+  // a pass-through to StreamReceiver
+  public func receive(ch : Chunk) : async Bool {
+    await* receiver.onChunk(ch);
   };
  
-  // pass-through to processor
+  // query the items processor
   public query func listReceived() : async [Text] {
     Buffer.toArray(received);
   };
@@ -77,7 +88,7 @@ actor class B() {
 };
 
 let b = await B(); // create receiver B
-let a = await A(b); // create sender A
+let a = await A(b.receive); // create sender A
 assert ((await a.queue("ab")) == #ok 0);
 assert ((await a.queue("bcd")) == #ok 1);
 assert ((await a.queue("cdefg")) == #ok 2);

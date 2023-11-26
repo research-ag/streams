@@ -24,6 +24,7 @@ module {
   /// The function `onChunk` throws in case of a gap (= broken pipe). The
   /// calling code should not catch the throw so that it gets passed through to
   /// the enclosing async expression of the calling code.
+  public type Chunk<T> = (Nat, [T]);
   public class StreamReceiver<T>(
     startIndex : Nat,
     timeoutSeconds : ?Nat,
@@ -53,7 +54,8 @@ module {
     /// a function, should be called by shared function or stream manager
     // This function is async* so that can throw an Error.
     // It does not make any subsequent calls.
-    public func onChunk(chunk : [T], firstIndex : Nat) : async* Bool {
+    public func onChunk(ch : Chunk<T>) : async* Bool {
+      let (firstIndex, chunk) = ch;
       if (firstIndex != length_) {
         throw Error.reject("Broken pipe in StreamReceiver");
       };

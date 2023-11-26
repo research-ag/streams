@@ -24,10 +24,11 @@ module {
   /// await* sender.sendChunk(); // will send (123, [1..10], 0) to `anotherCanister`
   /// await* sender.sendChunk(); // will send (123, [11..12], 10) to `anotherCanister`
   /// await* sender.sendChunk(); // will do nothing, stream clean
+  public type Chunk<S> = (Nat, [S]);
   public class StreamSender<T, S>(
     counterCreator : () -> { accept(item : T) : Bool },
     wrapItem : T -> S,
-    sendFunc : (items : [S], firstIndex : Nat) -> async* Bool,
+    sendFunc : (x : Chunk<S>) -> async* Bool,
     settings : {
       maxQueueSize : ?Nat;
       maxConcurrentChunks : ?Nat;
@@ -117,7 +118,8 @@ module {
       concurrentChunks += 1;
 
       let success = try {
-        await* sendFunc(elements, start);
+        let chunk = (start, elements);
+        await* sendFunc(chunk);
       } catch (e) {
         paused := true;
         receive();
