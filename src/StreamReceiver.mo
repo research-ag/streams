@@ -1,7 +1,6 @@
 import Debug "mo:base/Debug";
 import Error "mo:base/Error";
 import R "mo:base/Result";
-import Time "mo:base/Time";
 import Array "mo:base/Array";
 import SWB "mo:swb";
 
@@ -26,29 +25,29 @@ module {
   /// the enclosing async expression of the calling code.
   public type Chunk<T> = (Nat, [T]);
   public type ControlMsg = { #stop; #ok }; 
+  public type Timeout = ( Nat, () -> Int );
   public class StreamReceiver<T>(
     startIndex : Nat,
-    timeoutSeconds : ?Nat,
+    timeout : ?Timeout,
     itemCallback : (item : T, index : Nat) -> (),
     // itemCallback is custom made per-stream and contains the streamId
   ) {
 
     var length_ : Nat = startIndex;
-    var lastChunkReceived_ : Time.Time = Time.now();
 
     public func length() : Nat = length_;
 
-    let timeout : ?Nat = switch (timeoutSeconds) {
-      case (?s) ?(s * 1_000_000_000);
-      case (null) null;
+    var lastChunkReceived_ : Int = switch (timeout) {
+      case (?to) to.1();
+      case (_) 0;
     };
 
     /// returns timestamp when stream received last chunk
-    public func lastChunkReceived() : Time.Time = lastChunkReceived_;
+    public func lastChunkReceived() : Int = lastChunkReceived_;
 
     /// returns flag if receiver timed out because of non-activity
     public func hasTimedOut() : Bool = switch (timeout) {
-      case (?to)(Time.now() - lastChunkReceived_) > to;
+      case (?to)(to.1() - lastChunkReceived_) > to.0;
       case (null) false;
     };
 
@@ -61,7 +60,10 @@ module {
         throw Error.reject("Broken pipe in StreamReceiver");
       };
       if (hasTimedOut()) return #stop;
-      lastChunkReceived_ := Time.now();
+      switch (timeout) {
+        case (?to) lastChunkReceived_ := to.1();
+        case (_) {};
+      };
       for (i in chunk.keys()) {
         itemCallback(chunk[i], firstIndex + i);
       };

@@ -2,13 +2,14 @@ import StreamReceiver "../src/StreamReceiver";
 import StreamSender "../src/StreamSender";
 import Buffer "mo:base/Buffer";
 import Error "mo:base/Error";
+import Time "mo:base/Time";
 
 func createReceiver() : StreamReceiver.StreamReceiver<?Text> {
   let received = Buffer.Buffer<?Text>(0);
 
   let receiver = StreamReceiver.StreamReceiver<?Text>(
     0,
-    ?1,
+    ?(10**9, Time.now),
     func(item : ?Text, index : Nat) {
       assert index == received.size();
       received.add(item);
