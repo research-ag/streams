@@ -25,6 +25,9 @@ module {
   /// await* sender.sendChunk(); // will send (123, [11..12], 10) to `anotherCanister`
   /// await* sender.sendChunk(); // will do nothing, stream clean
   public type Chunk<S> = (Nat, [S]);
+
+  // T = queue item type
+  // S = stream item type
   public class StreamSender<T, S>(
     counterCreator : () -> { accept(item : T) : Bool },
     wrapItem : T -> S,
@@ -38,7 +41,7 @@ module {
     let MAX_CONCURRENT_CHUNKS_DEFAULT = 5;
 
     let buffer = SWB.SlidingWindowBuffer<T>();
-    
+
     let settings_ = {
       var maxQueueSize = settings.maxQueueSize;
       var maxConcurrentChunks = settings.maxConcurrentChunks;
@@ -51,19 +54,18 @@ module {
     var lastChunkSent = Time.now();
     var concurrentChunks = 0;
 
+    func isQueueFull() : Bool = switch (settings_.maxQueueSize) {
+      case (?max) buffer.len() >= max;
+      case (null) false;
+    };
+
     /// add item to the stream
-    public func add(item : T) : {
+    public func queue(item : T) : {
       #ok : Nat;
       #err : { #NoSpace };
     } {
-      switch (settings_.maxQueueSize) {
-        case (?max) {
-          if (buffer.len() >= max) {
-            return #err(#NoSpace);
-          };
-        };
-        case (null) {};
-      };
+      if (isQueueFull())
+      #err(#NoSpace) else
       #ok(buffer.add(item));
     };
 

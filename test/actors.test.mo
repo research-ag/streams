@@ -5,7 +5,7 @@ import Error "mo:base/Error";
 import Option "mo:base/Option";
 
 type Chunk = StreamSender.Chunk<?Text>;
-// or type Chunk = StreamReceiver.Chunk<?Text>;
+// = StreamReceiver.Chunk<?Text>;
 type ReceiveFunc = shared (Chunk) -> async Bool;
 
 // sender actor
@@ -16,15 +16,16 @@ actor class A(r : ReceiveFunc) {
   class counter() {
     var sum = 0;
     public func accept(item : Text) : Bool {
-      // the wrap function replaces too large items with null
+      // the wrap function below will replace too large items with null
       if (item.size() > MAX_LENGTH) return true;
       sum += item.size();
       sum <= MAX_LENGTH;
     };
   };
 
+  // Transform an item from queued form to chunk form.
   func wrap(item : Text) : ?Text {
-    if (item.size() <= MAX_LENGTH) { ?item } else { null };
+    if (item.size() <= MAX_LENGTH) ?item else null;
   };
 
   // Wrap the receiver's shared function.
@@ -49,7 +50,7 @@ actor class A(r : ReceiveFunc) {
   );
 
   public func queue(item : Text) : async { #err : { #NoSpace }; #ok : Nat } {
-    sender.add(item);
+    sender.queue(item);
   };
 
   public func trigger() : async () {
