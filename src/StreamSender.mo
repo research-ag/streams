@@ -24,15 +24,20 @@ module {
   /// await* sender.sendChunk(); // will send (123, [1..10], 0) to `anotherCanister`
   /// await* sender.sendChunk(); // will send (123, [11..12], 10) to `anotherCanister`
   /// await* sender.sendChunk(); // will do nothing, stream clean
-  public type Chunk<S> = (Nat, [S]);
-  public type ControlMsg = { #stop; #ok }; 
+  public type ChunkMsg<S> = (
+    Nat,
+    {
+      #chunk : [S];
+    },
+  );
+  public type ControlMsg = { #stopped; #ok };
 
   // T = queue item type
   // S = stream item type
   public class StreamSender<T, S>(
     counterCreator : () -> { accept(item : T) : Bool },
     wrapItem : T -> S,
-    sendFunc : (x : Chunk<S>) -> async* ControlMsg,
+    sendFunc : (x : ChunkMsg<S>) -> async* ControlMsg,
     settings : {
       maxQueueSize : ?Nat;
       maxConcurrentChunks : ?Nat;
@@ -121,7 +126,7 @@ module {
       concurrentChunks += 1;
 
       let response = try {
-        let chunk = (start, elements);
+        let chunk = (start, #chunk elements);
         await* sendFunc(chunk);
       } catch (e) {
         paused := true;
@@ -132,9 +137,7 @@ module {
       buffer.deleteTo(if (response == #ok) end else start);
       receive();
 
-      if (response == #stop) {
-        stopped := true;
-      };
+      if (response == #stopped) stopped := true;
     };
 
     /// total amount of items, ever added to the stream sender, also an index, which will be assigned to the next item
@@ -151,7 +154,8 @@ module {
 
     /// check busy status of sender
     public func isBusy() : Bool {
-      concurrentChunks == Option.get(settings_.maxConcurrentChunks, MAX_CONCURRENT_CHUNKS_DEFAULT);
+      concurrentChunks == Option.get(settings_.maxConcurrentChunks, 
+      MAX_CONCURRENT_CHUNKS_DEFAULT);
     };
 
     /// check busy level of sender, e.g. current amount of outgoing calls in flight

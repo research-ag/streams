@@ -23,9 +23,14 @@ module {
   /// The function `onChunk` throws in case of a gap (= broken pipe). The
   /// calling code should not catch the throw so that it gets passed through to
   /// the enclosing async expression of the calling code.
-  public type Chunk<T> = (Nat, [T]);
-  public type ControlMsg = { #stop; #ok }; 
-  public type Timeout = ( Nat, () -> Int );
+  public type ChunkMsg<T> = (
+    Nat,
+    {
+      #chunk : [T];
+    },
+  );
+  public type ControlMsg = { #stopped; #ok };
+  public type Timeout = (Nat, () -> Int);
   public class StreamReceiver<T>(
     startIndex : Nat,
     timeout : ?Timeout,
@@ -38,7 +43,7 @@ module {
     public func length() : Nat = length_;
 
     var lastChunkReceived_ : Int = switch (timeout) {
-      case (?to) to.1();
+      case (?to) to.1 ();
       case (_) 0;
     };
 
@@ -47,27 +52,31 @@ module {
 
     /// returns flag if receiver timed out because of non-activity
     public func hasTimedOut() : Bool = switch (timeout) {
-      case (?to)(to.1() - lastChunkReceived_) > to.0;
+      case (?to)(to.1 () - lastChunkReceived_) > to.0;
       case (null) false;
     };
 
     /// a function, should be called by shared function or stream manager
     // This function is async* so that can throw an Error.
     // It does not make any subsequent calls.
-    public func onChunk(ch : Chunk<T>) : async* ControlMsg {
-      let (firstIndex, chunk) = ch;
+    public func onChunk(cm : ChunkMsg<T>) : async* ControlMsg {
+      let (firstIndex, msg) = cm;
       if (firstIndex != length_) {
         throw Error.reject("Broken pipe in StreamReceiver");
       };
-      if (hasTimedOut()) return #stop;
+      switch (msg) {
+        case (#chunk ch) {
+          if (hasTimedOut()) return #stopped;
+          for (i in ch.keys()) {
+            itemCallback(ch[i], firstIndex + i);
+          };
+          length_ += ch.size();
+        };
+      };
       switch (timeout) {
-        case (?to) lastChunkReceived_ := to.1();
+        case (?to) lastChunkReceived_ := to.1 ();
         case (_) {};
       };
-      for (i in chunk.keys()) {
-        itemCallback(chunk[i], firstIndex + i);
-      };
-      length_ := firstIndex + chunk.size();
       return #ok;
     };
   };

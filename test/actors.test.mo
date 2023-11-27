@@ -5,9 +5,9 @@ import Error "mo:base/Error";
 import Option "mo:base/Option";
 
 // types for sender actor
-type Chunk = StreamSender.Chunk<?Text>;
-type ControlMsg = { #stop; #ok }; 
-type ReceiveFunc = shared (Chunk) -> async StreamSender.ControlMsg;
+type ChunkMsg = StreamSender.ChunkMsg<?Text>;
+type ControlMsg = { #stopped; #ok }; 
+type ReceiveFunc = shared (ChunkMsg) -> async StreamSender.ControlMsg;
 
 // sender actor
 // argument r is the receiver's shared receive function
@@ -35,8 +35,8 @@ actor class Alice(r : ReceiveFunc) {
   // We can place additional code here, for example, for logging.
   // However, we must not catch and convert any Errors. The Errors from
   // `await r` must be passed through unaltered or the StreamSender may break. 
-  func sendToReceiver(ch : Chunk) : async* ControlMsg {
-    await r(ch);
+  func sendToReceiver(m : ChunkMsg) : async* ControlMsg {
+    await r(m);
   };
 
   let sender = StreamSender.StreamSender<Text, ?Text>(
@@ -60,8 +60,8 @@ actor class Alice(r : ReceiveFunc) {
 };
 
 // types for sender actor
-// type Chunk = StreamReceiver.Chunk<?Text>;
-// type ControlMsg = { #stop; #ok }; 
+// type ChunkMsg = StreamReceiver.ChunkMsg<?Text>;
+// type ControlMsg = { #stopped; #ok }; 
 // type ReceiveFunc = shared (Chunk) -> async StreamReceiver.ControlMsg;
 
 // receiver actor
@@ -81,9 +81,9 @@ actor class Bob() {
 
   // required top-level boilerplate code,
   // a pass-through to StreamReceiver
-  public func receive(ch : Chunk) : async ControlMsg {
+  public func receive(cm : ChunkMsg) : async ControlMsg {
     if (failOn) throw Error.reject("failOn");
-    await* receiver.onChunk(ch);
+    await* receiver.onChunk(cm);
   };
  
   // query the items processor
