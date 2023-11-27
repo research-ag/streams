@@ -56,8 +56,7 @@ module {
     };
 
     var stopped = false;
-    var paused = false;
-    var head = 0;
+    var head : ?Nat = ?0;
     var lastChunkSent = Time.now();
     var concurrentChunks = 0;
 
@@ -80,10 +79,9 @@ module {
     public func sendChunk() : async* () {
       if (isStopped()) Debug.trap("Stream stopped");
       if (isBusy()) Debug.trap("Stream sender is busy");
-      if (isPaused()) Debug.trap("Stream sender is paused");
+      let ?start = head else Debug.trap("Stream sender is paused"); 
 
-      func chunk() : (Nat, Nat, [S]) {
-        var start = head;
+      let elements = do {
         var end = start;
         let counter = counterCreator();
         let vec = Vector.new<S>();
@@ -99,41 +97,40 @@ module {
             };
           };
         };
-        head := end;
-        (start, end, Vector.toArray(vec));
+        head := ?end;
+        Vector.toArray(vec);
       };
 
-      let (start, end, elements) = chunk();
-
-      func shouldPing(time : Int) : Bool {
+      func shouldPing() : Bool {
         switch (settings_.keepAliveSeconds) {
-          case (?i) lastChunkSent + i * 1_000_000_000 < time;
+          case (?i) lastChunkSent + i * 1_000_000_000 < Time.now();
           case (null) false;
         };
       };
 
-      let now = Time.now();
-
-      let chunkMsg = if (start == end) {
-        if (not shouldPing(now)) return;
+      let chunkMsg = if (elements.size() == 0) {
+        if (not shouldPing()) return;
         (start, #ping);
-      } else (start, #chunk elements);
+      } else {
+        (start, #chunk elements);
+      };
 
       func receive() {
         concurrentChunks -= 1;
-        if (concurrentChunks == 0 and paused) {
-          head := buffer.start();
-          paused := false;
+        if (concurrentChunks == 0 and head == null) {
+          head := ?buffer.start();
         };
       };
 
-      lastChunkSent := now;
+      lastChunkSent := Time.now();
       concurrentChunks += 1;
+      
+      let end = start + elements.size();
 
       let response = try {
         await* sendFunc(chunkMsg);
       } catch (e) {
-        paused := true;
+        head := null;
         receive();
         return;
       };
@@ -148,7 +145,7 @@ module {
     public func length() : Nat = buffer.end();
 
     /// amount of items, which were sent to receiver
-    public func sent() : Nat = head;
+    public func sent() : ?Nat = head;
 
     /// amount of items, successfully sent and acknowledged by receiver
     public func received() : Nat = buffer.start();
@@ -171,7 +168,7 @@ module {
     public func isStopped() : Bool = stopped;
 
     /// check paused status of sender
-    public func isPaused() : Bool = paused;
+    public func isPaused() : Bool = head == null;
 
     /// update max queue size
     public func setMaxQueueSize(value : ?Nat) {
