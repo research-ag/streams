@@ -10,8 +10,8 @@ func createReceiver() : StreamReceiver.StreamReceiver<?Text> {
   let receiver = StreamReceiver.StreamReceiver<?Text>(
     0,
     ?(10**9, Time.now),
-    func(item : ?Text, index : Nat) {
-      assert index == received.size();
+    func(pos : Nat, item : ?Text) {
+      assert pos == received.size();
       received.add(item);
     },
   );

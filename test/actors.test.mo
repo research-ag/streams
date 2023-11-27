@@ -68,7 +68,7 @@ actor class Alice(r : ReceiveFunc) {
 actor class Bob() {
   // processor of received items 
   let received = Buffer.Buffer<Text>(0);
-  func processItem(item : ?Text, _ : Nat) {
+  func processItem(_ : Nat, item : ?Text) {
     Option.iterate<Text>(item, func(x) = received.add(x));
   };
 

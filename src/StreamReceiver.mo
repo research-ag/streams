@@ -33,13 +33,13 @@ module {
   public type ControlMsg = { #stopped; #ok };
   public type Timeout = (Nat, () -> Int);
   public class StreamReceiver<T>(
-    startIndex : Nat,
+    startPos : Nat,
     timeout : ?Timeout,
-    itemCallback : (item : T, index : Nat) -> (),
+    itemCallback : (pos : Nat, item : T) -> (),
     // itemCallback is custom made per-stream and contains the streamId
   ) {
 
-    var length_ : Nat = startIndex;
+    var length_ : Nat = startPos;
 
     public func length() : Nat = length_;
 
@@ -61,15 +61,15 @@ module {
     // This function is async* so that can throw an Error.
     // It does not make any subsequent calls.
     public func onChunk(cm : ChunkMsg<T>) : async* ControlMsg {
-      let (firstIndex, msg) = cm;
-      if (firstIndex != length_) {
+      let (start, msg) = cm;
+      if (start != length_) {
         throw Error.reject("Broken pipe in StreamReceiver");
       };
       if (hasTimedOut()) return #stopped;
       switch (msg) {
         case (#chunk ch) {
           for (i in ch.keys()) {
-            itemCallback(ch[i], firstIndex + i);
+            itemCallback(start + i, ch[i]);
           };
           length_ += ch.size();
         };
