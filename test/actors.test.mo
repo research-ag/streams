@@ -6,7 +6,7 @@ import Option "mo:base/Option";
 
 // types for sender actor
 type ChunkMsg = StreamSender.ChunkMsg<?Text>;
-type ControlMsg = { #stopped; #ok }; 
+type ControlMsg = StreamSender.ControlMsg;
 type ReceiveFunc = shared (ChunkMsg) -> async StreamSender.ControlMsg;
 
 // sender actor
@@ -34,7 +34,7 @@ actor class Alice(r : ReceiveFunc) {
   // function into an async* return type.
   // We can place additional code here, for example, for logging.
   // However, we must not catch and convert any Errors. The Errors from
-  // `await r` must be passed through unaltered or the StreamSender may break. 
+  // `await r` must be passed through unaltered or the StreamSender may break.
   func sendToReceiver(m : ChunkMsg) : async* ControlMsg {
     await r(m);
   };
@@ -60,12 +60,12 @@ actor class Alice(r : ReceiveFunc) {
 
 // types for sender actor
 // type ChunkMsg = StreamReceiver.ChunkMsg<?Text>;
-// type ControlMsg = { #stopped; #ok }; 
+// type ControlMsg = StreamReceiver.ControlMsg;
 // type ReceiveFunc = shared (Chunk) -> async StreamReceiver.ControlMsg;
 
 // receiver actor
 actor class Bob() {
-  // processor of received items 
+  // processor of received items
   let received = Buffer.Buffer<Text>(0);
   func processItem(_ : Nat, item : ?Text) {
     Option.iterate<Text>(item, func(x) = received.add(x));
@@ -81,10 +81,11 @@ actor class Bob() {
   // required top-level boilerplate code,
   // a pass-through to StreamReceiver
   public func receive(cm : ChunkMsg) : async ControlMsg {
+    // The failOn flag is used to simulate Errors.
     if (failOn) throw Error.reject("failOn");
     await* receiver.onChunk(cm);
   };
- 
+
   // query the items processor
   public query func listReceived() : async [Text] {
     Buffer.toArray(received);
@@ -106,18 +107,19 @@ assert ((await a.submit("ab")) == #ok 0);
 assert ((await a.submit("bcd")) == #ok 1);
 assert ((await a.submit("cdefg")) == #ok 2);
 assert ((await a.submit("defghi")) == #ok 3);
-assert ((await a.submit("efg")) == #ok 4);
+assert ((await a.submit("efghij")) == #ok 4);
+assert ((await a.submit("fgh")) == #ok 5);
 assert ((await b.nReceived()) == 0);
-await a.trigger();
+await a.trigger(); // chunk ab, bcd
 assert ((await b.nReceived()) == 2);
 b.setFailOn(true);
 await a.trigger(); // chunk will fail
 await a.trigger(); // chunk will fail
 assert ((await b.nReceived()) == 2);
 b.setFailOn(false);
-await a.trigger(); // chunk will succeed
+await a.trigger(); // chunk cdefg
 assert ((await b.nReceived()) == 3);
-await a.trigger(); // 6-char item will be skipped
+await a.trigger(); // chunk null, null, fgh
 assert ((await b.nReceived()) == 4);
 await a.trigger(); // no items left
 assert ((await b.nReceived()) == 4);
@@ -125,4 +127,4 @@ let list = await b.listReceived();
 assert (list[0] == "ab");
 assert (list[1] == "bcd");
 assert (list[2] == "cdefg");
-assert (list[3] == "efg");
+assert (list[3] == "fgh");

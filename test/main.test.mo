@@ -26,7 +26,7 @@ func createSender(receiver : StreamReceiver.StreamReceiver<?Text>) : StreamSende
     {
       accept = func(item : Text) : ??Text {
         let (wrapped_item, wrapped_size) = if (item.size() <= MAX_LENGTH) {
-          (?item, item.size())
+          (?item, item.size());
         } else {
           (null, 0);
         };

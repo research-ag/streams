@@ -5,7 +5,7 @@ import Time "mo:base/Time";
 import Array "mo:base/Array";
 import Option "mo:base/Option";
 import SWB "mo:swb";
-import Vector "mo:vector/Class";
+import Vector "mo:vector";
 
 module {
   /// Usage:
@@ -26,7 +26,7 @@ module {
   /// await* sender.sendChunk(); // will send (123, [11..12], 10) to `anotherCanister`
   /// await* sender.sendChunk(); // will do nothing, stream clean
   public type ChunkMsg<S> = (
-    Nat,
+    startPos : Nat,
     {
       #chunk : [S];
       #ping;
@@ -38,7 +38,6 @@ module {
   // S = stream item type
   public class StreamSender<T, S>(
     counterCreator : () -> { accept(item : T) : ?S },
-//    wrapItem : T -> S,
     sendFunc : (x : ChunkMsg<S>) -> async* ControlMsg,
     settings : {
       maxQueueSize : ?Nat;
@@ -87,13 +86,13 @@ module {
         var start = head;
         var end = start;
         let counter = counterCreator();
-        let vec = Vector.Vector<S>();
+        let vec = Vector.new<S>();
         label l loop {
           switch (buffer.getOpt(end)) {
             case (null) break l;
             case (?item) {
               switch (counter.accept(item)) {
-                case (?x) vec.add(x);
+                case (?x) Vector.add(vec, x);
                 case (null) break l;
               };
               end += 1;
@@ -106,15 +105,18 @@ module {
 
       let (start, end, elements) = chunk();
 
-      func shouldPing() : Bool {
+      func shouldPing(time : Int) : Bool {
         switch (settings_.keepAliveSeconds) {
-          case (?i) lastChunkSent + i * 1_000_000_000 < Time.now();
+          case (?i) lastChunkSent + i * 1_000_000_000 < time;
           case (null) false;
         };
       };
 
+      let now = Time.now();
+
       let chunkMsg = if (start == end) {
-        if (shouldPing()) (start, #ping) else return;
+        if (not shouldPing(now)) return;
+        (start, #ping);
       } else (start, #chunk elements);
 
       func receive() {
@@ -125,7 +127,7 @@ module {
         };
       };
 
-      lastChunkSent := Time.now();
+      lastChunkSent := now;
       concurrentChunks += 1;
 
       let response = try {
@@ -156,8 +158,10 @@ module {
 
     /// check busy status of sender
     public func isBusy() : Bool {
-      concurrentChunks == Option.get(settings_.maxConcurrentChunks, 
-      MAX_CONCURRENT_CHUNKS_DEFAULT);
+      concurrentChunks == Option.get(
+        settings_.maxConcurrentChunks,
+        MAX_CONCURRENT_CHUNKS_DEFAULT,
+      );
     };
 
     /// check busy level of sender, e.g. current amount of outgoing calls in flight
