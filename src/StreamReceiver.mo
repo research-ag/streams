@@ -27,6 +27,7 @@ module {
     Nat,
     {
       #chunk : [T];
+      #ping;
     },
   );
   public type ControlMsg = { #stopped; #ok };
@@ -64,14 +65,15 @@ module {
       if (firstIndex != length_) {
         throw Error.reject("Broken pipe in StreamReceiver");
       };
+      if (hasTimedOut()) return #stopped;
       switch (msg) {
         case (#chunk ch) {
-          if (hasTimedOut()) return #stopped;
           for (i in ch.keys()) {
             itemCallback(ch[i], firstIndex + i);
           };
           length_ += ch.size();
         };
+        case (#ping) {};
       };
       switch (timeout) {
         case (?to) lastChunkReceived_ := to.1 ();

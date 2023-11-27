@@ -28,6 +28,7 @@ module {
     Nat,
     {
       #chunk : [S];
+      #ping;
     },
   );
   public type ControlMsg = { #stopped; #ok };
@@ -112,7 +113,9 @@ module {
         };
       };
 
-      if (start == end and not shouldPing()) return;
+      let chunkMsg = if (start == end) {
+        if (shouldPing()) (start, #ping) else return;
+      } else (start, #chunk elements);
 
       func receive() {
         concurrentChunks -= 1;
@@ -126,8 +129,7 @@ module {
       concurrentChunks += 1;
 
       let response = try {
-        let chunk = (start, #chunk elements);
-        await* sendFunc(chunk);
+        await* sendFunc(chunkMsg);
       } catch (e) {
         paused := true;
         receive();
