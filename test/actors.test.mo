@@ -82,8 +82,11 @@ actor class Bob() {
   // a pass-through to StreamReceiver
   public func receive(cm : ChunkMsg) : async ControlMsg {
     // The failOn flag is used to simulate Errors.
-    if (failOn) throw Error.reject("failOn");
-    await* receiver.onChunk(cm);
+    switch (mode) {
+      case (#off) await* receiver.onChunk(cm);
+      case (#reject) throw Error.reject("failOn");
+      case (#stopped) return #stopped;
+    };
   };
 
   // query the items processor
@@ -95,9 +98,10 @@ actor class Bob() {
   };
 
   // simulate Errors
-  var failOn = false;
-  public func setFailOn(b : Bool) {
-    failOn := b;
+  type FailMode = { #off; #reject; #stopped };
+  var mode : FailMode = #off;
+  public func setFailMode(m : FailMode) {
+    mode := m;
   };
 };
 
@@ -112,11 +116,11 @@ assert ((await a.submit("fgh")) == #ok 5);
 assert ((await b.nReceived()) == 0);
 await a.trigger(); // chunk ab, bcd
 assert ((await b.nReceived()) == 2);
-b.setFailOn(true);
+b.setFailMode(#reject);
 await a.trigger(); // chunk will fail
 await a.trigger(); // chunk will fail
 assert ((await b.nReceived()) == 2);
-b.setFailOn(false);
+b.setFailMode(#off);
 await a.trigger(); // chunk cdefg
 assert ((await b.nReceived()) == 3);
 await a.trigger(); // chunk null, null, fgh

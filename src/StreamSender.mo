@@ -127,18 +127,13 @@ module {
       
       let end = start + elements.size();
 
-      let response = try {
-        await* sendFunc(chunkMsg);
-      } catch (e) {
-        head := null;
-        receive();
-        return;
-      };
-
-      buffer.deleteTo(if (response == #ok) end else start);
+      try {
+        switch (await* sendFunc(chunkMsg)) {
+          case (#ok) buffer.deleteTo(end);
+          case (#stopped) stopped := true;
+        };
+      } catch (e) head := null;
       receive();
-
-      if (response == #stopped) stopped := true;
     };
 
     /// total amount of items, ever added to the stream sender, also an index, which will be assigned to the next item
