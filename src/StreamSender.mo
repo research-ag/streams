@@ -115,6 +115,10 @@ module {
         (start, #chunk elements);
       };
 
+      lastChunkSent := Time.now();
+      concurrentChunks += 1;
+      
+      let end = start + elements.size();
       func receive() {
         concurrentChunks -= 1;
         if (concurrentChunks == 0 and head == null) {
@@ -122,15 +126,13 @@ module {
         };
       };
 
-      lastChunkSent := Time.now();
-      concurrentChunks += 1;
-      
-      let end = start + elements.size();
-
       try {
         switch (await* sendFunc(chunkMsg)) {
           case (#ok) buffer.deleteTo(end);
-          case (#stopped) stopped := true;
+          case (#stopped) {
+            stopped := true;
+            buffer.deleteTo(start);
+          };
         };
       } catch (e) head := null;
       receive();
