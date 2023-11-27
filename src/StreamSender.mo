@@ -5,6 +5,7 @@ import Time "mo:base/Time";
 import Array "mo:base/Array";
 import Option "mo:base/Option";
 import SWB "mo:swb";
+import Vector "mo:vector/Class";
 
 module {
   /// Usage:
@@ -36,8 +37,8 @@ module {
   // T = queue item type
   // S = stream item type
   public class StreamSender<T, S>(
-    counterCreator : () -> { accept(item : T) : Bool },
-    wrapItem : T -> S,
+    counterCreator : () -> { accept(item : T) : ?S },
+//    wrapItem : T -> S,
     sendFunc : (x : ChunkMsg<S>) -> async* ControlMsg,
     settings : {
       maxQueueSize : ?Nat;
@@ -86,22 +87,21 @@ module {
         var start = head;
         var end = start;
         let counter = counterCreator();
-        label peekLoop while (true) {
+        let vec = Vector.Vector<S>();
+        label l loop {
           switch (buffer.getOpt(end)) {
-            case (null) break peekLoop;
+            case (null) break l;
             case (?item) {
-              if (not counter.accept(item)) break peekLoop;
+              switch (counter.accept(item)) {
+                case (?x) vec.add(x);
+                case (null) break l;
+              };
               end += 1;
             };
           };
         };
-        func pop() : T {
-          let ?x = buffer.getOpt(head) else Debug.trap("queue empty in pop()");
-          head += 1;
-          x;
-        };
-        let elements = Array.tabulate<S>(end - start, func(n) = wrapItem(pop()));
-        (start, end, elements);
+        head := end;
+        (start, end, Vector.toArray(vec));
       };
 
       let (start, end, elements) = chunk();

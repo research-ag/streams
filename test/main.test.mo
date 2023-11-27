@@ -9,7 +9,7 @@ func createReceiver() : StreamReceiver.StreamReceiver<?Text> {
 
   let receiver = StreamReceiver.StreamReceiver<?Text>(
     0,
-    ?(10**9, Time.now),
+    ?(10 ** 9, Time.now),
     func(pos : Nat, item : ?Text) {
       assert pos == received.size();
       received.add(item);
@@ -21,18 +21,19 @@ func createReceiver() : StreamReceiver.StreamReceiver<?Text> {
 func createSender(receiver : StreamReceiver.StreamReceiver<?Text>) : StreamSender.StreamSender<Text, ?Text> {
   let MAX_LENGTH = 5;
 
-  func counter() : { accept(Text) : Bool } {
+  func counter() : { accept(Text) : ??Text } {
     var sum = 0;
     {
-      accept = func(item : Text) : Bool {
-        sum += item.size();
-        sum <= MAX_LENGTH;
+      accept = func(item : Text) : ??Text {
+        let (wrapped_item, wrapped_size) = if (item.size() <= MAX_LENGTH) {
+          (?item, item.size())
+        } else {
+          (null, 0);
+        };
+        sum += wrapped_size;
+        if (sum <= MAX_LENGTH) ?wrapped_item else null;
       };
     };
-  };
-
-  func wrap(item : Text) : ?Text {
-    if (item.size() <= MAX_LENGTH) { ?item } else { null };
   };
 
   func send(ch : StreamSender.ChunkMsg<?Text>) : async* StreamSender.ControlMsg {
@@ -41,7 +42,6 @@ func createSender(receiver : StreamReceiver.StreamReceiver<?Text>) : StreamSende
 
   let sender = StreamSender.StreamSender<Text, ?Text>(
     counter,
-    wrap,
     send,
     {
       maxQueueSize = null;

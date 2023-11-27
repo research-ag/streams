@@ -16,17 +16,17 @@ actor class Alice(r : ReceiveFunc) {
 
   class counter() {
     var sum = 0;
-    public func accept(item : Text) : Bool {
-      // the wrap function below will replace too large items with null
-      if (item.size() > MAX_LENGTH) return true;
-      sum += item.size();
-      sum <= MAX_LENGTH;
+    // Any individual item larger than MAX_LENGTH is wrapped to null
+    // and its size is not counted.
+    func wrap(item : Text) : (?Text, Nat) {
+      let s = item.size();
+      if (s <= MAX_LENGTH) (?item, s) else (null, 0);
     };
-  };
-
-  // Transform an item from queued form to chunk form.
-  func wrap(item : Text) : ?Text {
-    if (item.size() <= MAX_LENGTH) ?item else null;
+    public func accept(item : Text) : ??Text {
+      let (wrapped, size) = wrap(item);
+      sum += size;
+      if (sum <= MAX_LENGTH) ?wrapped else null;
+    };
   };
 
   // Wrap the receiver's shared function.
@@ -41,7 +41,6 @@ actor class Alice(r : ReceiveFunc) {
 
   let sender = StreamSender.StreamSender<Text, ?Text>(
     counter,
-    wrap,
     sendToReceiver,
     {
       maxQueueSize = null;
