@@ -3,6 +3,8 @@ import StreamSender "../src/StreamSender";
 import Buffer "mo:base/Buffer";
 import Error "mo:base/Error";
 import Option "mo:base/Option";
+import Debug "mo:base/Debug";
+import Nat "mo:base/Nat";
 
 // types for receiver actor
 type ChunkMsg = StreamReceiver.ChunkMsg<?Text>;
@@ -12,8 +14,15 @@ type ControlMsg = StreamReceiver.ControlMsg;
 actor B {
   // processor of received items
   let received = Buffer.Buffer<Text>(0);
-  func processItem(_ : Nat, item : ?Text) {
-    Option.iterate<Text>(item, func(x) = received.add(x));
+  func processItem(i : Nat, item : ?Text) {
+    let prefix = ".   B item " # Nat.toText(i) # ": ";
+    switch (item) {
+      case (null) Debug.print(prefix # "null");
+      case (?x) {
+        Debug.print(prefix # x);
+        received.add(x);
+      };
+    };
   };
 
   // StreamReceiver
@@ -25,13 +34,34 @@ actor B {
 
   // required top-level boilerplate code,
   // a pass-through to StreamReceiver
-  public func receive(cm : ChunkMsg) : async ControlMsg {
-    // The failOn flag is used to simulate Errors.
-    switch (mode) {
-      case (#off) await* receiver.onChunk(cm);
-      case (#reject) throw Error.reject("failOn");
-      case (#stopped) return #stopped;
+  public func receive(m : ChunkMsg) : async ControlMsg {
+    let start = m.0;
+    var end = m.0;
+    var str = ".   B recv: (" # Nat.toText(m.0) # ", ";
+    switch (m.1) {
+      case (#ping) str #= "ping";
+      case (#chunk e) {
+        str #= "chunk [" # Nat.toText(e.size()) # "]";
+        end := start + e.size();
+      };
     };
+    Debug.print(str # ")");
+    str := ".   B reply: ";
+    // The fail mode is used to simulate artifical Errors.
+    let res = switch (mode) {
+      case (#off) await* receiver.onChunk(m);
+      case (#reject) {
+        Debug.print(str # "reject");
+        throw Error.reject("failMode");
+      };
+      case (#stopped) #stopped;
+    };
+    switch (res) {
+      case (#ok) str #= "#ok";
+      case (#stopped) str #= "#stopped";
+    };
+    Debug.print(str);
+    res;
   };
 
   // query the items processor
@@ -46,6 +76,13 @@ actor B {
   type FailMode = { #off; #reject; #stopped };
   var mode : FailMode = #off;
   public func setFailMode(m : FailMode) {
+    var str = ".   B failMode: ";
+    switch (m) {
+      case (#off) str #= "off";
+      case (#stopped) str #= "stopped";
+      case (#reject) str #= "reject";
+    };
+    Debug.print(str);
     mode := m;
   };
 };
@@ -77,7 +114,36 @@ actor A {
   // However, we must not catch and convert any Errors. The Errors from
   // `await r` must be passed through unaltered or the StreamSender may break.
   func sendToReceiver(m : ChunkMsg) : async* ControlMsg {
-    await B.receive(m);
+    let start = m.0;
+    var end = m.0;
+    var str = "A send: (" # Nat.toText(m.0) # ", ";
+    switch (m.1) {
+      case (#ping) str #= "ping";
+      case (#chunk e) {
+        str #= "chunk [" # Nat.toText(e.size()) # "]";
+        end := start + e.size();
+      };
+    };
+    Debug.print(str # ")");
+    str := "A recv: [" # Nat.toText(start) # "-" # Nat.toText(end) # ") ";
+    try {
+      let ret = await B.receive(m);
+      switch (ret) {
+        case (#ok) str #= "ok";
+        case (#stopped) str #= "stopped";
+      };
+      Debug.print(str);
+      return ret;
+    } catch (e) {
+      switch (Error.code(e)) {
+        case (#canister_reject) str #= "reject(";
+        case (#canister_error) str #= "trap(";
+        case (_) str #= "other(";
+      };
+      str #= "\"" # Error.message(e) # "\")";
+      Debug.print(str);
+      throw e;
+    };
   };
 
   let sender = StreamSender.StreamSender<Text, ?Text>(
@@ -91,14 +157,25 @@ actor A {
   );
 
   public func submit(item : Text) : async { #err : { #NoSpace }; #ok : Nat } {
-    sender.push(item);
+    let res = sender.push(item);
+    var str = "A submit: "; 
+    switch (res) {
+      case (#ok i) str #= Nat.toText(i);
+      case (#err e) str #= "NoSpace";
+    };
+    Debug.print(str);
+    res
   };
 
+  var t = 0;
   public func trigger() : async () {
+    let t_ = t;
+    t += 1;
+    Debug.print("A trigger: " # Nat.toText(t_) # " ");
     await* sender.sendChunk();
+    Debug.print("A trigger: " # Nat.toText(t_) # " <-");
   };
 };
-
 
 assert ((await A.submit("m0")) == #ok 0);
 assert ((await A.submit("m1")) == #ok 1);
