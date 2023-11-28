@@ -15,7 +15,7 @@ actor B {
   // processor of received items
   let received = Buffer.Buffer<Text>(0);
   func processItem(i : Nat, item : ?Text) {
-    let prefix = ".   B item " # Nat.toText(i) # ": ";
+    let prefix = ".   B   item " # Nat.toText(i) # ": ";
     switch (item) {
       case (null) Debug.print(prefix # "null");
       case (?x) {
@@ -75,15 +75,17 @@ actor B {
   // simulate Errors
   type FailMode = { #off; #reject; #stopped };
   var mode : FailMode = #off;
-  public func setFailMode(m : FailMode) {
-    var str = ".   B failMode: ";
-    switch (m) {
-      case (#off) str #= "off";
-      case (#stopped) str #= "stopped";
-      case (#reject) str #= "reject";
+  public func setFailMode(m : FailMode, n : Nat) : async () {
+    if (n > 0) await setFailMode(m, n - 1) else {
+      var str = ".   B failMode: ";
+      switch (m) {
+        case (#off) str #= "off";
+        case (#stopped) str #= "stopped";
+        case (#reject) str #= "reject";
+      };
+      Debug.print(str);
+      mode := m;
     };
-    Debug.print(str);
-    mode := m;
   };
 };
 
@@ -158,13 +160,13 @@ actor A {
 
   public func submit(item : Text) : async { #err : { #NoSpace }; #ok : Nat } {
     let res = sender.push(item);
-    var str = "A submit: "; 
+    var str = "A submit: ";
     switch (res) {
       case (#ok i) str #= Nat.toText(i);
       case (#err e) str #= "NoSpace";
     };
     Debug.print(str);
-    res
+    res;
   };
 
   var t = 0;
@@ -173,10 +175,12 @@ actor A {
     t += 1;
     Debug.print("A trigger: " # Nat.toText(t_) # " ");
     await* sender.sendChunk();
-    Debug.print("A trigger: " # Nat.toText(t_) # " <-");
+    // Debug.print("A trigger: " # Nat.toText(t_) # " <-");
   };
 };
 
+// Part 1: messages arrive and return one by one
+Debug.print("=== Part 1 ===");
 assert ((await A.submit("m0")) == #ok 0);
 assert ((await A.submit("m1")) == #ok 1);
 assert ((await A.submit("m2xxx")) == #ok 2);
@@ -186,11 +190,11 @@ assert ((await A.submit("m5")) == #ok 5);
 assert ((await B.nReceived()) == 0);
 await A.trigger(); // chunk m0, m1
 assert ((await B.nReceived()) == 2);
-B.setFailMode(#reject);
+await B.setFailMode(#reject, 0);
 await A.trigger(); // chunk will fail
 await A.trigger(); // chunk will fail
 assert ((await B.nReceived()) == 2);
-B.setFailMode(#off);
+await B.setFailMode(#off, 0);
 await A.trigger(); // chunk cdefg
 assert ((await B.nReceived()) == 3);
 await A.trigger(); // chunk null, null, fgh
@@ -202,3 +206,26 @@ assert (list[0] == "m0");
 assert (list[1] == "m1");
 assert (list[2] == "m2xxx");
 assert (list[3] == "m5");
+
+// Part 2: second message sent out before first one returns
+Debug.print("=== Part 2 ===");
+assert ((await A.submit("m6xxx")) == #ok 6);
+assert ((await A.submit("m7xxx")) == #ok 7);
+ignore A.trigger();
+ignore A.trigger();
+await async {};
+await async {};
+
+// Part 3: test broken pipe behaviour
+Debug.print("=== Part 3 ===");
+assert ((await A.submit("m8")) == #ok 8);
+assert ((await A.submit("m9")) == #ok 9);
+assert ((await A.submit("mA")) == #ok 10);
+assert ((await A.submit("mB")) == #ok 11);
+ignore B.setFailMode(#reject, 0);
+ignore A.trigger();
+ignore B.setFailMode(#off, 1);
+ignore A.trigger();
+await async {};
+ignore A.trigger();
+ignore A.trigger();
