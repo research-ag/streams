@@ -5,6 +5,7 @@ import Time "mo:base/Time";
 import Array "mo:base/Array";
 import Option "mo:base/Option";
 import SWB "mo:swb";
+import Vector "mo:vector";
 
 module {
   /// Usage:
@@ -24,10 +25,20 @@ module {
   /// await* sender.sendChunk(); // will send (123, [1..10], 0) to `anotherCanister`
   /// await* sender.sendChunk(); // will send (123, [11..12], 10) to `anotherCanister`
   /// await* sender.sendChunk(); // will do nothing, stream clean
+  public type ChunkMsg<S> = (
+    startPos : Nat,
+    {
+      #chunk : [S];
+      #ping;
+    },
+  );
+  public type ControlMsg = { #stopped; #ok };
+
+  // T = queue item type
+  // S = stream item type
   public class StreamSender<T, S>(
-    counterCreator : () -> { accept(item : T) : Bool },
-    wrapItem : T -> S,
-    sendFunc : (items : [S], firstIndex : Nat) -> async* Bool,
+    counterCreator : () -> { accept(item : T) : ?S },
+    sendFunc : (x : ChunkMsg<S>) -> async* ControlMsg,
     settings : {
       maxQueueSize : ?Nat;
       maxConcurrentChunks : ?Nat;
@@ -37,64 +48,58 @@ module {
     let MAX_CONCURRENT_CHUNKS_DEFAULT = 5;
 
     let buffer = SWB.SlidingWindowBuffer<T>();
-    
+
     let settings_ = {
       var maxQueueSize = settings.maxQueueSize;
       var maxConcurrentChunks = settings.maxConcurrentChunks;
       var keepAliveSeconds = settings.keepAliveSeconds;
     };
 
-    var closed = false;
-    var paused = false;
-    var head = 0;
+    var stopped = false;
+    var head : ?Nat = ?0;
     var lastChunkSent = Time.now();
     var concurrentChunks = 0;
 
+    func isQueueFull() : Bool = switch (settings_.maxQueueSize) {
+      case (?max) buffer.len() >= max;
+      case (null) false;
+    };
+
     /// add item to the stream
-    public func add(item : T) : {
+    public func push(item : T) : {
       #ok : Nat;
       #err : { #NoSpace };
     } {
-      switch (settings_.maxQueueSize) {
-        case (?max) {
-          if (buffer.len() >= max) {
-            return #err(#NoSpace);
-          };
-        };
-        case (null) {};
-      };
+      if (isQueueFull())
+      #err(#NoSpace) else
       #ok(buffer.add(item));
     };
 
     /// send chunk to the receiver
     public func sendChunk() : async* () {
-      if (isClosed()) Debug.trap("Stream closed");
+      if (isStopped()) Debug.trap("Stream stopped");
       if (isBusy()) Debug.trap("Stream sender is busy");
-      if (isPaused()) Debug.trap("Stream sender is paused");
+      let ?start = head else Debug.trap("Stream sender is paused"); 
 
-      func chunk() : (Nat, Nat, [S]) {
-        var start = head;
+      let elements = do {
         var end = start;
         let counter = counterCreator();
-        label peekLoop while (true) {
+        let vec = Vector.new<S>();
+        label l loop {
           switch (buffer.getOpt(end)) {
-            case (null) break peekLoop;
+            case (null) break l;
             case (?item) {
-              if (not counter.accept(item)) break peekLoop;
+              switch (counter.accept(item)) {
+                case (?x) Vector.add(vec, x);
+                case (null) break l;
+              };
               end += 1;
             };
           };
         };
-        func pop() : T {
-          let ?x = buffer.getOpt(head) else Debug.trap("queue empty in pop()");
-          head += 1;
-          x;
-        };
-        let elements = Array.tabulate<S>(end - start, func(n) = wrapItem(pop()));
-        (start, end, elements);
+        head := ?end;
+        Vector.toArray(vec);
       };
-
-      let (start, end, elements) = chunk();
 
       func shouldPing() : Bool {
         switch (settings_.keepAliveSeconds) {
@@ -103,40 +108,41 @@ module {
         };
       };
 
-      if (start == end and not shouldPing()) return;
-
-      func receive() {
-        concurrentChunks -= 1;
-        if (concurrentChunks == 0 and paused) {
-          head := buffer.start();
-          paused := false;
-        };
+      let chunkMsg = if (elements.size() == 0) {
+        if (not shouldPing()) return;
+        (start, #ping);
+      } else {
+        (start, #chunk elements);
       };
 
       lastChunkSent := Time.now();
       concurrentChunks += 1;
-
-      let success = try {
-        await* sendFunc(elements, start);
-      } catch (e) {
-        paused := true;
-        receive();
-        throw e;
+      
+      let end = start + elements.size();
+      func receive() {
+        concurrentChunks -= 1;
+        if (concurrentChunks == 0 and head == null) {
+          head := ?buffer.start();
+        };
       };
 
-      buffer.deleteTo(if success { end } else { start });
+      try {
+        switch (await* sendFunc(chunkMsg)) {
+          case (#ok) buffer.deleteTo(end);
+          case (#stopped) {
+            stopped := true;
+            buffer.deleteTo(start);
+          };
+        };
+      } catch (e) head := null;
       receive();
-
-      if (not success) {
-        closed := true;
-      };
     };
 
     /// total amount of items, ever added to the stream sender, also an index, which will be assigned to the next item
     public func length() : Nat = buffer.end();
 
     /// amount of items, which were sent to receiver
-    public func sent() : Nat = head;
+    public func sent() : ?Nat = head;
 
     /// amount of items, successfully sent and acknowledged by receiver
     public func received() : Nat = buffer.start();
@@ -146,17 +152,20 @@ module {
 
     /// check busy status of sender
     public func isBusy() : Bool {
-      concurrentChunks == Option.get(settings_.maxConcurrentChunks, MAX_CONCURRENT_CHUNKS_DEFAULT);
+      concurrentChunks == Option.get(
+        settings_.maxConcurrentChunks,
+        MAX_CONCURRENT_CHUNKS_DEFAULT,
+      );
     };
 
     /// check busy level of sender, e.g. current amount of outgoing calls in flight
     public func busyLevel() : Nat = concurrentChunks;
 
-    /// returns flag is receiver closed the stream
-    public func isClosed() : Bool = closed;
+    /// returns flag is receiver stopped the stream
+    public func isStopped() : Bool = stopped;
 
     /// check paused status of sender
-    public func isPaused() : Bool = paused;
+    public func isPaused() : Bool = head == null;
 
     /// update max queue size
     public func setMaxQueueSize(value : ?Nat) {
