@@ -1,13 +1,22 @@
 import StreamReceiver "../src/StreamReceiver";
 import StreamSender "../src/StreamSender";
+import { StreamReceiver = Receiver } "../src/StreamReceiver";
+import { StreamSender = Sender } "../src/StreamSender";
 import Buffer "mo:base/Buffer";
 import Error "mo:base/Error";
 import Time "mo:base/Time";
+import Debug "mo:base/Debug";
+import Nat "mo:base/Nat";
 
-func createReceiver() : StreamReceiver.StreamReceiver<?Text> {
+type ChunkMsg = StreamSender.ChunkMsg<?Text>;
+type ControlMsg = StreamSender.ControlMsg;
+type Sender<T,S> = StreamSender.StreamSender<T,S>;
+type Receiver<S> = StreamReceiver.StreamReceiver<S>;
+
+func createReceiver() : Receiver<?Text> {
   let received = Buffer.Buffer<?Text>(0);
 
-  let receiver = StreamReceiver.StreamReceiver<?Text>(
+  let receiver = Receiver<?Text>(
     0,
     ?(10 ** 9, Time.now),
     func(pos : Nat, item : ?Text) {
@@ -18,7 +27,7 @@ func createReceiver() : StreamReceiver.StreamReceiver<?Text> {
   receiver;
 };
 
-func createSender(receiver : StreamReceiver.StreamReceiver<?Text>) : StreamSender.StreamSender<Text, ?Text> {
+func createSender(receiver : Receiver<?Text>) : Sender<Text, ?Text> {
   let MAX_LENGTH = 5;
 
   func counter() : { accept(Text) : ??Text } {
@@ -36,11 +45,9 @@ func createSender(receiver : StreamReceiver.StreamReceiver<?Text>) : StreamSende
     };
   };
 
-  func send(ch : StreamSender.ChunkMsg<?Text>) : async* StreamSender.ControlMsg {
-    await* receiver.onChunk(ch);
-  };
+  func send(ch : ChunkMsg) : async* ControlMsg { receiver.onChunk(ch) };
 
-  let sender = StreamSender.StreamSender<Text, ?Text>(
+  let sender = Sender<Text, ?Text>(
     counter,
     send,
     {
@@ -65,12 +72,13 @@ ignore sender.push("abc");
 ignore sender.push("abc");
 ignore sender.push("abc");
 
-await* sender.sendChunk();
-await* sender.sendChunk();
-await* sender.sendChunk();
-await* sender.sendChunk();
-/*
-while (true) {
+let n = sender.length();
+
+var i = 0;
+let max = 100;
+while (sender.received() < n and i < max) {
   await* sender.sendChunk();
-};
-*/
+  i += 1;
+}; 
+Debug.print("sent " # Nat.toText(i) # " chunks");
+assert i != max;

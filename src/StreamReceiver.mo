@@ -30,7 +30,7 @@ module {
       #ping;
     },
   );
-  public type ControlMsg = { #stopped; #ok };
+  public type ControlMsg = { #stopped; #ok; #gap };
   public type Timeout = (Nat, () -> Int);
   public class StreamReceiver<T>(
     startPos : Nat,
@@ -57,14 +57,10 @@ module {
       case (null) false;
     };
 
-    /// a function, should be called by shared function or stream manager
-    // This function is async* so that can throw an Error.
-    // It does not make any subsequent calls.
-    public func onChunk(cm : ChunkMsg<T>) : async* ControlMsg {
+    /// processes a chunk and responds to sender
+    public func onChunk(cm : ChunkMsg<T>) : ControlMsg {
       let (start, msg) = cm;
-      if (start != length_) {
-        throw Error.reject("Broken pipe in StreamReceiver");
-      };
+      if (start != length_) return #gap;
       if (hasTimedOut()) return #stopped;
       switch (msg) {
         case (#chunk ch) {

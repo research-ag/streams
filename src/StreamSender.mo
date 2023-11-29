@@ -32,7 +32,7 @@ module {
       #ping;
     },
   );
-  public type ControlMsg = { #stopped; #ok };
+  public type ControlMsg = { #stopped; #ok; #gap };
 
   // T = queue item type
   // S = stream item type
@@ -133,6 +133,7 @@ module {
             stopped := true;
             buffer.deleteTo(start);
           };
+          case (#gap) head := null;
         };
       } catch (e) head := null;
       receive();
