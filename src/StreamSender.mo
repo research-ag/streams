@@ -1,6 +1,5 @@
 import Debug "mo:base/Debug";
 import Error "mo:base/Error";
-import Prim "mo:prim";
 import R "mo:base/Result";
 import Time "mo:base/Time";
 import Array "mo:base/Array";
@@ -77,8 +76,8 @@ module {
     };
 
     type SendChunkResult = ControlMsg or {
-      #callErrorTransient : (Prim.ErrorCode, Text);
-      #callErrorPermanent : (Prim.ErrorCode, Text);
+      #callErrorTransient;
+      #callErrorPermanent;
     };
 
     /// send chunk to the receiver
@@ -135,11 +134,9 @@ module {
       let res : SendChunkResult = try {
         await* sendFunc(chunkMsg);
       } catch (err) {
-        let code = Error.code(err);
-        let msg = Error.message(err);
-        switch (code) {
-          case (#system_transient or #canister_error _ or #call_error _) #callErrorTransient(code, msg);
-          case (#system_fatal or #destination_invalid or #canister_reject or #future _) #callErrorPermanent(code, msg);
+        switch (Error.code(err)) {
+          case (#system_transient or #canister_error _ or #call_error _) #callErrorTransient;
+          case (#system_fatal or #destination_invalid or #canister_reject or #future _) #callErrorPermanent;
         };
       };
       switch (res) {
