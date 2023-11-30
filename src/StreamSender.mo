@@ -145,7 +145,7 @@ module {
           stopped := true;
           buffer.deleteTo(start);
         };
-        case (#gap or #callErrorTransient _ or #callErrorPermanent _) head := null;
+        case (#gap or #callErrorTransient or #callErrorPermanent) head := null;
       };
       receive();
       res;
