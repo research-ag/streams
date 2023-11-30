@@ -176,7 +176,7 @@ actor A {
     let t_ = t;
     t += 1;
     Debug.print("A trigger: " # Nat.toText(t_) # " ");
-    await* sender.sendChunk();
+    ignore await* sender.sendChunk();
     // Debug.print("A trigger: " # Nat.toText(t_) # " <-");
   };
 

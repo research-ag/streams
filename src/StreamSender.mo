@@ -1,5 +1,6 @@
 import Debug "mo:base/Debug";
 import Error "mo:base/Error";
+import Prim "mo:prim";
 import R "mo:base/Result";
 import Time "mo:base/Time";
 import Array "mo:base/Array";
@@ -75,11 +76,16 @@ module {
       #ok(buffer.add(item));
     };
 
+    type SendChunkResult = ControlMsg or {
+      #callErrorTransient : (Prim.ErrorCode, Text);
+      #callErrorPermanent : (Prim.ErrorCode, Text);
+    };
+
     /// send chunk to the receiver
-    public func sendChunk() : async* () {
+    public func sendChunk() : async* SendChunkResult {
       if (isStopped()) Debug.trap("Stream stopped");
       if (isBusy()) Debug.trap("Stream sender is busy");
-      let ?start = head else Debug.trap("Stream sender is paused"); 
+      let ?start = head else Debug.trap("Stream sender is paused");
 
       let elements = do {
         var end = start;
@@ -109,7 +115,7 @@ module {
       };
 
       let chunkMsg = if (elements.size() == 0) {
-        if (not shouldPing()) return;
+        if (not shouldPing()) return #ok;
         (start, #ping);
       } else {
         (start, #chunk elements);
@@ -117,7 +123,7 @@ module {
 
       lastChunkSent := Time.now();
       concurrentChunks += 1;
-      
+
       let end = start + elements.size();
       func receive() {
         concurrentChunks -= 1;
@@ -126,17 +132,26 @@ module {
         };
       };
 
-      try {
-        switch (await* sendFunc(chunkMsg)) {
-          case (#ok) buffer.deleteTo(end);
-          case (#stopped) {
-            stopped := true;
-            buffer.deleteTo(start);
-          };
-          case (#gap) head := null;
+      let res : SendChunkResult = try {
+        await* sendFunc(chunkMsg);
+      } catch (err) {
+        let code = Error.code(err);
+        let msg = Error.message(err);
+        switch (code) {
+          case (#system_transient or #canister_error _ or #call_error _) #callErrorTransient(code, msg);
+          case (#system_fatal or #destination_invalid or #canister_reject or #future _) #callErrorPermanent(code, msg);
         };
-      } catch (e) head := null;
+      };
+      switch (res) {
+        case (#ok) buffer.deleteTo(end);
+        case (#stopped) {
+          stopped := true;
+          buffer.deleteTo(start);
+        };
+        case (#gap or #callErrorTransient _ or #callErrorPermanent _) head := null;
+      };
       receive();
+      res;
     };
 
     /// total amount of items, ever added to the stream sender, also an index, which will be assigned to the next item
