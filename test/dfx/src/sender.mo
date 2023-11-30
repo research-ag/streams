@@ -1,11 +1,12 @@
 import StreamReceiver "../../../src/StreamReceiver";
 import StreamSender "../../../src/StreamSender";
+import Types "../../../src/Types";
 import Principal "mo:base/Principal";
 import Result "mo:base/Result";
 
 actor class Sender(receiverId : Principal) {
   let receiver = actor (Principal.toText(receiverId)) : actor {
-    receive : (message : StreamReceiver.ChunkMsg<?Text>) -> async StreamReceiver.ControlMsg;
+    receive : (message : Types.ChunkMsg<?Text>) -> async Types.ControlMsg;
   };
 
   let MAX_LENGTH = 5;
@@ -25,7 +26,7 @@ actor class Sender(receiverId : Principal) {
     };
   };
 
-  func send(message : StreamReceiver.ChunkMsg<?Text>) : async* StreamReceiver.ControlMsg {
+  func send(message : Types.ChunkMsg<?Text>) : async* Types.ControlMsg {
     await receiver.receive(message);
   };
 
@@ -44,6 +45,6 @@ actor class Sender(receiverId : Principal) {
   };
 
   system func heartbeat() : async() {
-    await* sender.sendChunk();
+    assert (await* sender.sendChunk()) == #ok;
   };
 };

@@ -5,10 +5,11 @@ import Error "mo:base/Error";
 import Option "mo:base/Option";
 import Debug "mo:base/Debug";
 import Nat "mo:base/Nat";
+import Types "../src/Types";
 
 // types for receiver actor
-type ChunkMsg = StreamReceiver.ChunkMsg<?Text>;
-type ControlMsg = StreamReceiver.ControlMsg;
+type ChunkMsg = Types.ChunkMsg<?Text>;
+type ControlMsg = Types.ControlMsg;
 
 // receiver actor
 actor B {

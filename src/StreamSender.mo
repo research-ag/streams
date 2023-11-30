@@ -6,6 +6,7 @@ import Array "mo:base/Array";
 import Option "mo:base/Option";
 import SWB "mo:swb";
 import Vector "mo:vector";
+import Types "Types";
 
 module {
   /// Usage:
@@ -25,20 +26,16 @@ module {
   /// await* sender.sendChunk(); // will send (123, [1..10], 0) to `anotherCanister`
   /// await* sender.sendChunk(); // will send (123, [11..12], 10) to `anotherCanister`
   /// await* sender.sendChunk(); // will do nothing, stream clean
-  public type ChunkMsg<S> = (
-    startPos : Nat,
-    {
-      #chunk : [S];
-      #ping;
-    },
-  );
-  public type ControlMsg = { #stopped; #ok; #gap };
+  public type SendChunkResult = Types.ControlMsg or {
+    #callErrorTransient;
+    #callErrorPermanent;
+  };
 
   // T = queue item type
   // S = stream item type
   public class StreamSender<T, S>(
     counterCreator : () -> { accept(item : T) : ?S },
-    sendFunc : (x : ChunkMsg<S>) -> async* ControlMsg,
+    sendFunc : (x : Types.ChunkMsg<S>) -> async* Types.ControlMsg,
     settings : {
       maxQueueSize : ?Nat;
       maxConcurrentChunks : ?Nat;
@@ -73,11 +70,6 @@ module {
       if (isQueueFull())
       #err(#NoSpace) else
       #ok(buffer.add(item));
-    };
-
-    type SendChunkResult = ControlMsg or {
-      #callErrorTransient;
-      #callErrorPermanent;
     };
 
     /// send chunk to the receiver

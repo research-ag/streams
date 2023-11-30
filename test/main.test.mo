@@ -7,9 +7,10 @@ import Error "mo:base/Error";
 import Time "mo:base/Time";
 import Debug "mo:base/Debug";
 import Nat "mo:base/Nat";
+import Types "../src/Types";
 
-type ChunkMsg = StreamSender.ChunkMsg<?Text>;
-type ControlMsg = StreamSender.ControlMsg;
+type ChunkMsg = Types.ChunkMsg<?Text>;
+type ControlMsg = Types.ControlMsg;
 type Sender<T,S> = StreamSender.StreamSender<T,S>;
 type Receiver<S> = StreamReceiver.StreamReceiver<S>;
 
