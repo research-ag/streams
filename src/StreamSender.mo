@@ -135,7 +135,7 @@ module {
         await* sendFunc(chunkMsg);
       } catch (err) {
         switch (Error.code(err)) {
-          case (#system_transient or #canister_error _ or #call_error _) #callErrorTransient;
+          case (#system_transient or #canister_error or #call_error _) #callErrorTransient;
           case (#system_fatal or #destination_invalid or #canister_reject or #future _) #callErrorPermanent;
         };
       };
