@@ -49,7 +49,7 @@ actor B {
     str := ".   B reply: ";
     // The fail mode is used to simulate artifical Errors.
     let res = switch (mode) {
-      case (#off) await* receiver.onChunk(m);
+      case (#off) receiver.onChunk(m);
       case (#reject) {
         Debug.print(str # "reject");
         throw Error.reject("failMode");
@@ -59,6 +59,7 @@ actor B {
     switch (res) {
       case (#ok) str #= "#ok";
       case (#stopped) str #= "#stopped";
+      case (#gap) str #= "#gap"; 
     };
     Debug.print(str);
     res;
@@ -133,6 +134,7 @@ actor A {
       switch (ret) {
         case (#ok) str #= "ok";
         case (#stopped) str #= "stopped";
+        case (#gap) str #= "gap";
       };
       Debug.print(str);
       return ret;
@@ -174,7 +176,7 @@ actor A {
     let t_ = t;
     t += 1;
     Debug.print("A trigger: " # Nat.toText(t_) # " ");
-    await* sender.sendChunk();
+    ignore await* sender.sendChunk();
     // Debug.print("A trigger: " # Nat.toText(t_) # " <-");
   };
 
