@@ -26,11 +26,6 @@ module {
   /// await* sender.sendChunk(); // will send (123, [1..10], 0) to `anotherCanister`
   /// await* sender.sendChunk(); // will send (123, [11..12], 10) to `anotherCanister`
   /// await* sender.sendChunk(); // will do nothing, stream clean
-  public type SendChunkResult = Types.ControlMsg or {
-    #callErrorTransient;
-    #callErrorPermanent;
-  };
-
   // T = queue item type
   // S = stream item type
   public class StreamSender<T, S>(
@@ -73,29 +68,29 @@ module {
     };
 
     /// Get the stream sender's status for inspection.
-    /// 
+    ///
     /// The function is sychronous. It can be used (optionally) by the user of
     /// the class before calling the asynchronous function sendChunk.
-    /// 
+    ///
     /// sendChunk will attempt to send a chunk if and only if the status is
     /// #ready.  sendChunk will throw if and only if the status is #stopped,
     /// #paused or #busy.
-    /// 
+    ///
     /// #stopped means that the stream sender was stopped by the receiver, e.g.
     /// due to a timeout.
-    /// 
+    ///
     /// #paused means that at least one chunk could not be delivered and the
     /// stream sender is waiting for outstanding responses to come back before
     /// it can resume sending chunks. When it resumes it will start from the
     /// first item that did not arrive.
-    /// 
+    ///
     /// #busy means that there are too many chunk concurrently in flight. The
     /// sender is waiting for outstanding responses to come back before sending
     /// any new chunks.
-    /// 
+    ///
     /// #ready n means that the stream sender is ready to send a chunk starting
     /// from position n.
-    
+
     public func status() : { #stopped; #paused; #busy; #ready : Nat } {
       if (isStopped()) return #stopped;
       let ?start = head else return #paused;
@@ -104,14 +99,14 @@ module {
     };
 
     /// Send chunk to the receiver
-    /// 
+    ///
     /// A return value () means that the stream sender was ready to send the
     /// chunk and attempted to send it. It does not mean that the chunk was
     /// delivered to the receiver.
-    /// 
+    ///
     /// If the stream sender is not ready (stopped, paused or busy) then the
     /// function throws immediately and does not attempt to send the chunk.
-    
+
     public func sendChunk() : async* () {
       let start = switch (status()) {
         case (#stopped) throw Error.reject("Stream stopped by receiver");
@@ -156,10 +151,12 @@ module {
 
       lastChunkSent := Time.now();
       concurrentChunks += 1;
+      Debug.print(debug_show concurrentChunks);
 
       let end = start + elements.size();
       func receive() {
         concurrentChunks -= 1;
+        Debug.print(debug_show concurrentChunks);
         if (concurrentChunks == 0 and head == null) {
           head := ?buffer.start();
         };

@@ -45,6 +45,6 @@ actor class Sender(receiverId : Principal) {
   };
 
   system func heartbeat() : async() {
-    assert (await* sender.sendChunk()) == #ok;
+    await* sender.sendChunk();
   };
 };
