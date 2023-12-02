@@ -6,7 +6,6 @@ import Array "mo:base/Array";
 import Option "mo:base/Option";
 import SWB "mo:swb";
 import Vector "mo:vector";
-import Types "Types";
 
 module {
   /// Usage:
@@ -26,11 +25,21 @@ module {
   /// await* sender.sendChunk(); // will send (123, [1..10], 0) to `anotherCanister`
   /// await* sender.sendChunk(); // will send (123, [11..12], 10) to `anotherCanister`
   /// await* sender.sendChunk(); // will do nothing, stream clean
+  public type ChunkMsg<S> = (
+    startPos : Nat,
+    {
+      #chunk : [S];
+      #ping;
+    },
+  );
+  public type ControlMsg = { #stopped; #ok; #gap };
+  public type Status = { #stopped; #paused; #busy; #ready : Nat };
+
   // T = queue item type
   // S = stream item type
   public class StreamSender<T, S>(
     counterCreator : () -> { accept(item : T) : ?S },
-    sendFunc : (x : Types.ChunkMsg<S>) -> async* Types.ControlMsg,
+    sendFunc : (x : ChunkMsg<S>) -> async* ControlMsg,
     settings : {
       maxQueueSize : ?Nat;
       maxConcurrentChunks : ?Nat;
@@ -91,7 +100,7 @@ module {
     /// #ready n means that the stream sender is ready to send a chunk starting
     /// from position n.
 
-    public func status() : { #stopped; #paused; #busy; #ready : Nat } {
+    public func status() : Status {
       if (isStopped()) return #stopped;
       let ?start = head else return #paused;
       if (isBusy()) return #busy;
@@ -151,12 +160,10 @@ module {
 
       lastChunkSent := Time.now();
       concurrentChunks += 1;
-      Debug.print(debug_show concurrentChunks);
 
       let end = start + elements.size();
       func receive() {
         concurrentChunks -= 1;
-        Debug.print(debug_show concurrentChunks);
         if (concurrentChunks == 0 and head == null) {
           head := ?buffer.start();
         };

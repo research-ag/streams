@@ -7,6 +7,7 @@ import Nat "mo:base/Nat";
 import Iter "mo:base/Iter";
 import Nat32 "mo:base/Nat32";
 import Debug "mo:base/Debug";
+import Error "mo:base/Error";
 
 func create(maxLength : Nat) : (() -> { accept : (item : Text) -> ??Text }) {
   class counter() {
@@ -128,47 +129,70 @@ func create(maxLength : Nat) : (() -> { accept : (item : Text) -> ??Text }) {
 //   assert sender.status() == #ready 0;
 // };
 
-do {
-  func send(message : Types.ChunkMsg<?Text>) : async* Types.ControlMsg {
-    #gap;
+type ChunkResponse = { #ok; #gap; #stopped; #reject; #trap };
+class Chunk(type_ : ChunkResponse) = {
+  var lock = true;
+  public func run() : async Types.ControlMsg {
+    while (lock) await async {};
+    switch (type_) {
+      case (#ok) #ok;
+      case (#gap) #gap;
+      case (#stopped) #stopped;
+      case (#reject) throw Error.reject("");
+      // trap may not work as intended in the interpreter
+      case (#trap) Debug.trap("");
+    };
   };
+  public func release() = lock := false;
+};
 
+var chunkRegister : Chunk = Chunk(#ok);
+func load(c : Chunk) {
+  chunkRegister := c;
+};
+
+func sendChunkMsg(message : Types.ChunkMsg<?Text>) : async* Types.ControlMsg {
+  let c = chunkRegister;
+  await c.run();
+};
+
+do {
   let sender = StreamSender.StreamSender<Text, ?Text>(
     create(5),
-    send,
+    sendChunkMsg,
     {
       maxQueueSize = null;
       maxConcurrentChunks = null;
       keepAliveSeconds = null;
     },
   );
-  Result.assertOk(sender.push("abc"));
-  Result.assertOk(sender.push("abc"));
-  Result.assertOk(sender.push("abc"));
 
-  let a1 = async {
-    sender.status();
-  };
-
-  ignore async {
+  func send(c : Chunk) : async () {
+    chunkRegister := c;
+    Debug.print("send: " # debug_show sender.status());
     await* sender.sendChunk();
-  };
-  
-  let a2 = async {
-    sender.status();
+    Debug.print("return: " # debug_show sender.status());
   };
 
-  ignore async {
-    await* sender.sendChunk();
+  for (i in Iter.range(1, 10)) {
+    Result.assertOk(sender.push("abc"));
   };
 
-  let a3 = async {
-    sender.status();
-  };
-  
-  await async {};
+  let t = [#ok, #reject, #gap, #ok, #gap, #ok];
+  let c = Array.map<ChunkResponse, Chunk>(t, func(x) = Chunk(x));
+  var r = Array.init<async ()>(t.size(), async ());
 
-  Debug.print(debug_show (await a1));
-  Debug.print(debug_show (await a2));
-  Debug.print(debug_show (await a3));
+  var i = 0;
+  // Note: We cannot pass futures across contexts, neither to functions nore
+  // return them from functions. The closest solution to defining a convenience
+  // function was to make copy-pastable lines like the ones below. We cannot
+  // read or write the r[] array from within a function.
+  i := 0; do { r[i] := send(c[i]) }; // send chunk i
+  i := 1; do { r[i] := send(c[i]) }; // send chunk i
+  i := 2; do { r[i] := send(c[i]) }; // send chunk i
+  i := 2; do { c[i].release(); await r[i] }; // return chunk i
+  i := 0; do { c[i].release(); await r[i] }; // return chunk i
+  i := 1; do { c[i].release(); await r[i] }; // return chunk i
+  i := 3; do { r[i] := send(c[i]) }; // send chunk i
+  i := 3; do { c[i].release(); await r[i] }; // return chunk i
 };
