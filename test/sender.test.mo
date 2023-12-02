@@ -171,7 +171,7 @@ do {
     chunkRegister := c;
     Debug.print("send: " # debug_show sender.status());
     await* sender.sendChunk();
-    Debug.print("return: " # debug_show sender.status());
+    Debug.print("return: " # debug_show sender.lastResponse() # " -> " # debug_show sender.status());
   };
 
   for (i in Iter.range(1, 10)) {
@@ -183,10 +183,11 @@ do {
   var r = Array.init<async ()>(t.size(), async ());
 
   var i = 0;
-  // Note: We cannot pass futures across contexts, neither to functions nore
-  // return them from functions. The closest solution to defining a convenience
-  // function was to make copy-pastable lines like the ones below. We cannot
-  // read or write the r[] array from within a function.
+  // Note: We cannot pass futures across contexts, neither as arguments to
+  // functions nor return them from functions. The closest solution to defining
+  // a convenience function was to make copy-pastable lines like the ones below.
+  // We cannot read or write the r[] array from within a function.
+
   i := 0; do { r[i] := send(c[i]) }; // send chunk i
   i := 1; do { r[i] := send(c[i]) }; // send chunk i
   i := 2; do { r[i] := send(c[i]) }; // send chunk i

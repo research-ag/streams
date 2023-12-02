@@ -34,6 +34,7 @@ module {
   );
   public type ControlMsg = { #stopped; #ok; #gap };
   public type Status = { #stopped; #paused; #busy; #ready : Nat };
+  public type ChunkResponse = { #ok; #gap; #stopped; #error : Error.ErrorCode};
 
   // T = queue item type
   // S = stream item type
@@ -107,6 +108,10 @@ module {
       return #ready start;
     };
 
+
+    var lastResponse_ : ChunkResponse = #ok;
+    public func lastResponse() : ChunkResponse = lastResponse_;
+
     /// Send chunk to the receiver
     ///
     /// A return value () means that the stream sender was ready to send the
@@ -171,14 +176,24 @@ module {
 
       try {
         switch (await* sendFunc(chunkMsg)) {
-          case (#ok) buffer.deleteTo(end);
+          case (#ok) {
+            buffer.deleteTo(end);
+            lastResponse_ := #ok;
+          };
           case (#stopped) {
             stopped := true;
             buffer.deleteTo(start);
+            lastResponse_ := #stopped;
           };
-          case (#gap) head := null;
+          case (#gap) {
+            head := null;
+            lastResponse_ := #gap;
+          };
         };
-      } catch (e) head := null;
+      } catch (e) {
+        head := null;
+        lastResponse_ := #error (Error.code(e));
+      };
       receive();
     };
 
