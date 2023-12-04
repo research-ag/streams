@@ -85,8 +85,42 @@ do {
   await s.expect(#ready 2, 2);
 };
 
-do {
-  let s = Sender();
-  let chunk = Array.tabulate<Chunk>(2, func(i) = Chunk());
-  var result = Array.init<async ()>(chunk.size(), async ());
-};
+// do {
+//   let s = Sender();
+//   let chunk = Array.tabulate<Chunk>(2, func(i) = Chunk());
+//   var result = Array.init<async ()>(chunk.size(), async ());
+
+//   result[0] := s.send(chunk[0]);
+//   await s.expect(#ready 1, 0);
+
+//   result[1] := s.send(chunk[1]);
+//   await s.expect(#ready 2, 0);
+
+//   chunk[0].release(#stopped);
+//   await result[0];
+//   await s.expect(#ready 2, 1);
+
+//   chunk[1].release(#ok);
+//   await result[1];
+//   await s.expect(#ready 2, 2);
+// };
+
+// do {
+//   let s = Sender();
+//   let chunk = Array.tabulate<Chunk>(2, func(i) = Chunk());
+//   var result = Array.init<async ()>(chunk.size(), async ());
+  
+//   result[0] := s.send(chunk[0]);
+//   await s.expect(#ready 1, 0);
+
+//   result[1] := s.send(chunk[1]);
+//   await s.expect(#ready 2, 0);
+
+//   chunk[0].release(#gap);
+//   await result[0];
+//   await s.expect(#paused, );
+
+//   chunk[1].release(#gap);
+//   await result[1];
+//   await s.expect(#paused, );
+// };

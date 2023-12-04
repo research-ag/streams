@@ -163,8 +163,20 @@ module {
       };
 
       try {
-        switch (await* sendFunc(chunkMsg)) {
-          case (#ok) buffer.deleteTo(end);
+        let result = await* sendFunc(chunkMsg);
+        switch (status()) {
+          case (#stopped) throw Error.reject("Stream stopped by receiver");
+          case (#paused) throw Error.reject("Stream is paused");
+          case (#busy) {};
+          case (#ready x) {};
+        };
+        switch (result) {
+          case (#ok) {
+            if (head != ?end) {
+              throw Error.reject("Order of messages is broken");
+            };
+            buffer.deleteTo(end);
+          };
           case (#stopped) {
             stopped := true;
             buffer.deleteTo(start);
