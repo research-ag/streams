@@ -132,24 +132,25 @@ func create(maxLength : Nat) : (() -> { accept : (item : Text) -> ??Text }) {
 // Note: A chunk response of #trap (aka canister_error) cannot be simulated with
 // the moc interpreter. Calling Debug.trap() to generate the error would
 // instantly terminate the whole test.
-type ChunkResponse = { #ok; #gap; #stopped; #reject; #none };
+type ChunkResponse = { #ok; #gap; #stopped; #reject };
 
-class Chunk(type_ : ChunkResponse) = {
-  public var lock = true;
+class Chunk(name_ : Text) = {
+  var response : ?ChunkResponse = null;
+  public func name() : Text = name_;
   public func run() : async Types.ControlMsg {
-    while (lock) await async {};
-    switch (type_) {
-      case (#ok) #ok;
-      case (#gap) #gap;
-      case (#stopped) #stopped;
-      case (#reject) throw Error.reject("");
-      case (#none) Debug.trap("chunk was not expected to be sent");
+    while (response == null) await async {};
+    switch (response) {
+      case (?#ok) #ok;
+      case (?#gap) #gap;
+      case (?#stopped) #stopped;
+      case (?#reject) throw Error.reject("");
+      case (null) Debug.trap("cannot happen");
     };
   };
-  public func release() = lock := false;
+  public func release(r : ChunkResponse) = response := ?r;
 };
 
-var chunkRegister : Chunk = Chunk(#ok);
+var chunkRegister : Chunk = Chunk("initial");
 func load(c : Chunk) {
   chunkRegister := c;
 };
@@ -170,8 +171,9 @@ do {
     },
   );
 
-  func send(c : Chunk, txt : Text) : async () {
+  func send(c : Chunk) : async () {
     chunkRegister := c;
+    let txt = c.name();
     Debug.print("send " # txt # ": " # debug_show sender.status());
     try {
       await* sender.sendChunk();
@@ -191,9 +193,8 @@ do {
     Result.assertOk(sender.push("abc"));
   };
 
-  let t = [#ok, #reject, #gap, #none, #ok, #ok];
-  let c = Array.map<ChunkResponse, Chunk>(t, func(x) = Chunk(x));
-  var r = Array.init<async ()>(t.size(), async ());
+  let c = Array.tabulate<Chunk>(6, func(i) = Chunk(Nat.toText(i)));
+  var r = Array.init<async ()>(c.size(), async ());
 
   var i = 0;
   // Note: We cannot pass futures across contexts, neither as arguments to
@@ -201,15 +202,15 @@ do {
   // global r[] array from within a function either. That's why it is hard to
   // shorten the commands below with any kind of convenience function.
 
-  r[0] := send(c[0], "0"); ignore expect(#ready 1, 0); // send chunk 0
-  r[1] := send(c[1], "1"); ignore expect(#ready 2, 0); // send chunk 1
-  r[2] := send(c[2], "2"); ignore expect(#ready 3, 0 ); // send chunk 2
-  c[2].release(); await r[2]; ignore expect(#paused, 0); // return chunk 2
-  c[0].release(); await r[0]; ignore expect(#paused, 1); // return chunk 0
-  r[3] := send(c[3], "3"); await r[3]; ignore expect(#paused, 1); // send chunk 3, returns immediately 
-  c[1].release(); await r[1]; ignore expect(#ready 1, 1); // return chunk 1
-  r[4] := send(c[4], "4"); ignore expect(#ready 2, 1); // send chunk 4
-  r[5] := send(c[5], "5"); ignore expect(#ready 3, 1); // send chunk 5
-  c[4].release(); await r[4]; ignore expect(#ready 3, 2); // return chunk 4
-  c[5].release(); await r[5]; ignore expect(#ready 3, 3); // return chunk 5
+  r[0] := send(c[0]); ignore expect(#ready 1, 0); // send chunk 0
+  r[1] := send(c[1]); ignore expect(#ready 2, 0); // send chunk 1
+  r[2] := send(c[2]); ignore expect(#ready 3, 0 ); // send chunk 2
+  c[2].release(#gap); await r[2]; ignore expect(#paused, 0); // return chunk 2
+  c[0].release(#ok); await r[0]; ignore expect(#paused, 1); // return chunk 0
+  r[3] := send(c[3]); await r[3]; ignore expect(#paused, 1); // send chunk 3, but it does not send 
+  c[1].release(#reject); await r[1]; ignore expect(#ready 1, 1); // return chunk 1
+  r[4] := send(c[4]); ignore expect(#ready 2, 1); // send chunk 4
+  r[5] := send(c[5]); ignore expect(#ready 3, 1); // send chunk 5
+  c[4].release(#ok); await r[4]; ignore expect(#ready 3, 2); // return chunk 4
+  c[5].release(#ok); await r[5]; ignore expect(#ready 3, 3); // return chunk 5
 };
