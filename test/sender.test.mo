@@ -147,7 +147,7 @@ class Chunk(name_ : Text) = {
       case (null) Debug.trap("cannot happen");
     };
   };
-  public func release(r : ChunkResponse) = response := ?r;
+  public func respond(r : ChunkResponse) = response := ?r;
 };
 
 var chunkRegister : Chunk = Chunk("initial");
@@ -173,13 +173,13 @@ do {
 
   func send(c : Chunk) : async () {
     chunkRegister := c;
-    let txt = c.name();
-    Debug.print("send " # txt # ": " # debug_show sender.status());
+    let txt = c.name() # ": ";
+    Debug.print("send " # txt # debug_show sender.status());
     try {
       await* sender.sendChunk();
-      Debug.print("return " # txt # ": " # debug_show sender.lastResponse() # " -> " # debug_show sender.status());
+      Debug.print("return " # txt # debug_show sender.lastResponse() # " -> " # debug_show sender.status());
     } catch (e) {
-      Debug.print("return " # txt # ": didn't send");
+      Debug.print("return " # txt # "didn't send");
     };
   };
 
@@ -205,12 +205,12 @@ do {
   r[0] := send(c[0]); ignore expect(#ready 1, 0); // send chunk 0
   r[1] := send(c[1]); ignore expect(#ready 2, 0); // send chunk 1
   r[2] := send(c[2]); ignore expect(#ready 3, 0 ); // send chunk 2
-  c[2].release(#gap); await r[2]; ignore expect(#paused, 0); // return chunk 2
-  c[0].release(#ok); await r[0]; ignore expect(#paused, 1); // return chunk 0
+  c[2].respond(#gap); await r[2]; ignore expect(#paused, 0); // return chunk 2
+  c[0].respond(#ok); await r[0]; ignore expect(#paused, 1); // return chunk 0
   r[3] := send(c[3]); await r[3]; ignore expect(#paused, 1); // send chunk 3, but it does not send 
-  c[1].release(#reject); await r[1]; ignore expect(#ready 1, 1); // return chunk 1
+  c[1].respond(#reject); await r[1]; ignore expect(#ready 1, 1); // return chunk 1
   r[4] := send(c[4]); ignore expect(#ready 2, 1); // send chunk 4
   r[5] := send(c[5]); ignore expect(#ready 3, 1); // send chunk 5
-  c[4].release(#ok); await r[4]; ignore expect(#ready 3, 2); // return chunk 4
-  c[5].release(#ok); await r[5]; ignore expect(#ready 3, 3); // return chunk 5
+  c[4].respond(#ok); await r[4]; ignore expect(#ready 3, 2); // return chunk 4
+  c[5].respond(#ok); await r[5]; ignore expect(#ready 3, 3); // return chunk 5
 };
