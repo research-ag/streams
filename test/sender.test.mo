@@ -129,7 +129,11 @@ func create(maxLength : Nat) : (() -> { accept : (item : Text) -> ??Text }) {
 //   assert sender.status() == #ready 0;
 // };
 
-type ChunkResponse = { #ok; #gap; #stopped; #reject; #trap };
+// Note: A chunk response of #trap (aka canister_error) cannot be simulated with
+// the moc interpreter. Calling Debug.trap() to generate the error would
+// instantly terminate the whole test.
+type ChunkResponse = { #ok; #gap; #stopped; #reject };
+
 class Chunk(type_ : ChunkResponse) = {
   var lock = true;
   public func run() : async Types.ControlMsg {
@@ -139,8 +143,6 @@ class Chunk(type_ : ChunkResponse) = {
       case (#gap) #gap;
       case (#stopped) #stopped;
       case (#reject) throw Error.reject("");
-      // trap may not work as intended in the interpreter
-      case (#trap) Debug.trap("");
     };
   };
   public func release() = lock := false;
@@ -178,22 +180,23 @@ do {
     Result.assertOk(sender.push("abc"));
   };
 
-  let t = [#ok, #reject, #gap, #ok, #gap, #ok];
+  let t = [#ok, #reject, #gap, #ok, #reject, #ok];
   let c = Array.map<ChunkResponse, Chunk>(t, func(x) = Chunk(x));
   var r = Array.init<async ()>(t.size(), async ());
 
   var i = 0;
   // Note: We cannot pass futures across contexts, neither as arguments to
-  // functions nor return them from functions. The closest solution to defining
-  // a convenience function was to make copy-pastable lines like the ones below.
-  // We cannot read or write the r[] array from within a function.
-
-  i := 0; do { r[i] := send(c[i]) }; // send chunk i
-  i := 1; do { r[i] := send(c[i]) }; // send chunk i
-  i := 2; do { r[i] := send(c[i]) }; // send chunk i
-  i := 2; do { c[i].release(); await r[i] }; // return chunk i
-  i := 0; do { c[i].release(); await r[i] }; // return chunk i
-  i := 1; do { c[i].release(); await r[i] }; // return chunk i
-  i := 3; do { r[i] := send(c[i]) }; // send chunk i
-  i := 3; do { c[i].release(); await r[i] }; // return chunk i
+  // functions nor return them from functions. We cannot read or write the
+  // global r[] array from within a function either. The closest solution to
+  // defining a convenience function was to make copy-pastable lines like the
+  // ones below.
+  
+  i := 0; do { r[i] := send(c[i]) }; // send chunk 0
+  i := 1; do { r[i] := send(c[i]) }; // send chunk 1
+  i := 2; do { r[i] := send(c[i]) }; // send chunk 2
+  i := 2; do { c[i].release(); await r[i] }; // return chunk 2
+  i := 0; do { c[i].release(); await r[i] }; // return chunk 0
+  i := 1; do { c[i].release(); await r[i] }; // return chunk 1
+  i := 3; do { r[i] := send(c[i]) }; // send chunk 3
+  i := 3; do { c[i].release(); await r[i] }; // return chunk 3
 };
