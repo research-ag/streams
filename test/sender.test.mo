@@ -144,8 +144,8 @@ func myassert(b : Bool) {
 };
 
 // Note: A chunk response of #trap (aka canister_error) cannot be simulated with
-// the moc interpreter. Calling Debug.trap() to generate the error would
-// instantly terminate the whole test.
+// the moc interpreter. Calling Debug.trap() inside an async expression does not
+// convert to a catchable Error type as it would on the IC.
 
 type ChunkResponse = { #ok; #gap; #stopped; #reject };
 
@@ -225,15 +225,21 @@ do {
   // global r[] array from within a function either. That's why it is hard to
   // shorten the commands below with any kind of convenience function.
 
-  r[0] := send(c[0]); await async expect(#ready 1, 0); // send chunk 0
-  r[1] := send(c[1]); await async expect(#ready 2, 0); // send chunk 1
-  r[2] := send(c[2]); await async expect(#ready 3, 0 ); // send chunk 2
+  // Note: The `async await {}` are needed for the `send()` calls to take effect
+  // before the `expect()` is run.  It can be seen as an analog to `await r[i]`
+  // after `c[i].respond()`. It is required because `send()` is an async
+  // function.
+  
+  expect(#ready 0, 0); // initial state
+  r[0] := send(c[0]); await async {}; expect(#ready 1, 0); // send chunk 0
+  r[1] := send(c[1]); await async {}; expect(#ready 2, 0); // send chunk 1
+  r[2] := send(c[2]); await async {}; expect(#ready 3, 0 ); // send chunk 2
   c[2].respond(#gap); await r[2]; expect(#paused, 0); // return chunk 2
   c[0].respond(#ok); await r[0]; expect(#paused, 1); // return chunk 0
   r[3] := send(c[3]); await r[3]; expect(#paused, 1); // send chunk 3, but it does not send
   c[1].respond(#reject); await r[1]; expect(#ready 1, 1); // return chunk 1
-  r[4] := send(c[4]); await async expect(#ready 2, 1); // send chunk 4
-  r[5] := send(c[5]); await async expect(#ready 3, 1); // send chunk 5
+  r[4] := send(c[4]); await async {}; expect(#ready 2, 1); // send chunk 4
+  r[5] := send(c[5]); await async {}; expect(#ready 3, 1); // send chunk 5
   c[4].respond(#ok); await r[4]; expect(#ready 3, 2); // return chunk 4
   c[5].respond(#ok); await r[5]; expect(#ready 3, 3); // return chunk 5
 };
