@@ -129,23 +129,43 @@ func create(maxLength : Nat) : (() -> { accept : (item : Text) -> ??Text }) {
 //   assert sender.status() == #ready 0;
 // };
 
+var trapped = false;
+func trap() {
+  // Note: The interpreter does not roll back state changes. Hence trapped := true
+  // will take effect despite the assert false.
+  trapped := true;
+  assert false;
+};
+func myassert(b : Bool) {
+  if (not b) {
+    Debug.print("==== assertion failure. Stopping test here. ====");
+    trap();
+  };
+};
+
 // Note: A chunk response of #trap (aka canister_error) cannot be simulated with
 // the moc interpreter. Calling Debug.trap() to generate the error would
 // instantly terminate the whole test.
+
 type ChunkResponse = { #ok; #gap; #stopped; #reject };
 
 class Chunk(name_ : Text) = {
   var response : ?ChunkResponse = null;
   public func name() : Text = name_;
   public func run() : async Types.ControlMsg {
-    while (response == null) await async {};
+    while (response == null and not trapped) await async {};
     switch (response) {
-      case (?#ok) #ok;
-      case (?#gap) #gap;
-      case (?#stopped) #stopped;
-      case (?#reject) throw Error.reject("");
-      case (null) Debug.trap("cannot happen");
+      case (? #ok) #ok;
+      case (? #gap) #gap;
+      case (? #stopped) #stopped;
+      case (? #reject) throw Error.reject("");
+      case (null) #stopped;
     };
+    // Note: In case null the test is aborted due to an assertion failure
+    // elsewhere.  We make all chunk respond with #stopped as if the receiver
+    // had stopped the stream. It does not really matter what we return here
+    // though we expect that #stopped will lead to cleaner debug output than
+    // other choices.
   };
   public func respond(r : ChunkResponse) = response := ?r;
 };
@@ -183,14 +203,17 @@ do {
     };
   };
 
-  func expect(st : StreamSender.Status, pos : Nat) : async () {
+  func expect(st : StreamSender.Status, pos : Nat) : () {
     Debug.print("expect " # debug_show st # " start= " # debug_show sender.received());
-    assert sender.status() == st;
-    assert sender.received() == pos;
+    myassert(sender.status() == st);
+    myassert(sender.received() == pos);
   };
 
   for (i in Iter.range(1, 10)) {
-    Result.assertOk(sender.push("abc"));
+    switch (sender.push("abc")) {
+      case (#err _) myassert(false);
+      case (_) {};
+    };
   };
 
   let c = Array.tabulate<Chunk>(6, func(i) = Chunk(Nat.toText(i)));
@@ -202,15 +225,15 @@ do {
   // global r[] array from within a function either. That's why it is hard to
   // shorten the commands below with any kind of convenience function.
 
-  r[0] := send(c[0]); ignore expect(#ready 1, 0); // send chunk 0
-  r[1] := send(c[1]); ignore expect(#ready 2, 0); // send chunk 1
-  r[2] := send(c[2]); ignore expect(#ready 3, 0 ); // send chunk 2
-  c[2].respond(#gap); await r[2]; ignore expect(#paused, 0); // return chunk 2
-  c[0].respond(#ok); await r[0]; ignore expect(#paused, 1); // return chunk 0
-  r[3] := send(c[3]); await r[3]; ignore expect(#paused, 1); // send chunk 3, but it does not send 
-  c[1].respond(#reject); await r[1]; ignore expect(#ready 1, 1); // return chunk 1
-  r[4] := send(c[4]); ignore expect(#ready 2, 1); // send chunk 4
-  r[5] := send(c[5]); ignore expect(#ready 3, 1); // send chunk 5
-  c[4].respond(#ok); await r[4]; ignore expect(#ready 3, 2); // return chunk 4
-  c[5].respond(#ok); await r[5]; ignore expect(#ready 3, 3); // return chunk 5
+  r[0] := send(c[0]); await async expect(#ready 1, 0); // send chunk 0
+  r[1] := send(c[1]); await async expect(#ready 2, 0); // send chunk 1
+  r[2] := send(c[2]); await async expect(#ready 3, 0 ); // send chunk 2
+  c[2].respond(#gap); await r[2]; expect(#paused, 0); // return chunk 2
+  c[0].respond(#ok); await r[0]; expect(#paused, 1); // return chunk 0
+  r[3] := send(c[3]); await r[3]; expect(#paused, 1); // send chunk 3, but it does not send
+  c[1].respond(#reject); await r[1]; expect(#ready 1, 1); // return chunk 1
+  r[4] := send(c[4]); await async expect(#ready 2, 1); // send chunk 4
+  r[5] := send(c[5]); await async expect(#ready 3, 1); // send chunk 5
+  c[4].respond(#ok); await r[4]; expect(#ready 3, 2); // return chunk 4
+  c[5].respond(#ok); await r[5]; expect(#ready 3, 3); // return chunk 5
 };
