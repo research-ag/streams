@@ -27,12 +27,10 @@ module {
   /// await* sender.sendChunk(); // will send (123, [1..10], 0) to `anotherCanister`
   /// await* sender.sendChunk(); // will send (123, [11..12], 10) to `anotherCanister`
   /// await* sender.sendChunk(); // will do nothing, stream clean
-  public type ChunkMsg<T> = Types.ChunkMsg<T>;
-  public type ControlMsg = Types.ControlMsg;
 
   // T = queue item type
   // S = stream item type
-  public type Status = { #stopped; #paused; #busy; #ready : Nat };
+  public type Status = { #shutdown; #stopped; #paused; #busy; #ready : Nat };
 
   public class StreamSender<T, S>(
     counterCreator : () -> { accept(item : T) : ?S },
@@ -103,7 +101,6 @@ module {
     /// #ready n means that the stream sender is ready to send a chunk starting
     /// from position n.
 
-    public type Status = { #shutdown; #stopped; #paused; #busy; #ready : Nat };
     public func status() : Status {
       if (isShutdown()) return #shutdown;
       if (isStopped()) return #stopped;

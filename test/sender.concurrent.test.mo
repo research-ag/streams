@@ -1,5 +1,5 @@
 import StreamSender "../src/StreamSender";
-import Types "../src/Types";
+import Types "../src/types";
 import Result "mo:base/Result";
 import Debug "mo:base/Debug";
 import Error "mo:base/Error";
@@ -19,7 +19,7 @@ class Chunk() {
     switch (response) {
       case (? #ok) #ok;
       case (? #gap) #gap;
-      case (? #stopped) #stopped;
+      case (? #stopped) #stop;
       case (? #reject) throw Error.reject("");
       case (null) Debug.trap("cannot happen");
     };

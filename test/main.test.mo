@@ -7,7 +7,7 @@ import Error "mo:base/Error";
 import Time "mo:base/Time";
 import Debug "mo:base/Debug";
 import Nat "mo:base/Nat";
-import Types "../src/Types";
+import Types "../src/types";
 
 type ChunkMsg = Types.ChunkMsg<?Text>;
 type ControlMsg = Types.ControlMsg;

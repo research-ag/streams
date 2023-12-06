@@ -5,7 +5,7 @@ import Error "mo:base/Error";
 import Option "mo:base/Option";
 import Debug "mo:base/Debug";
 import Nat "mo:base/Nat";
-import Types "../src/Types";
+import Types "../src/types";
 
 // types for receiver actor
 type ChunkMsg = Types.ChunkMsg<?Text>;

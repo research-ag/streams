@@ -1,5 +1,5 @@
 import StreamSender "../src/StreamSender";
-import Types "../src/Types";
+import Types "../src/types";
 import Result "mo:base/Result";
 import Array "mo:base/Array";
 import Char "mo:base/Char";
@@ -75,7 +75,7 @@ do {
 
 do {
   func send(message : Types.ChunkMsg<?Text>) : async* Types.ControlMsg {
-    #stopped;
+    #stop;
   };
 
   let sender = StreamSender.StreamSender<Text, ?Text>(

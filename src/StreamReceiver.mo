@@ -6,7 +6,6 @@ import SWB "mo:swb";
 import Types "types";
 
 module {
-
   /// Usage:
   ///
   /// let receiver = StreamReceiver<Int>(
@@ -24,8 +23,6 @@ module {
   /// The function `onChunk` throws in case of a gap (= broken pipe). The
   /// calling code should not catch the throw so that it gets passed through to
   /// the enclosing async expression of the calling code.
-  public type ChunkMsg<T> = Types.ChunkMsg<T>;
-  public type ControlMsg = Types.ControlMsg;
   public type Timeout = (Nat, () -> Int);
   public class StreamReceiver<T>(
     startPos : Nat,
