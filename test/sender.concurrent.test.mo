@@ -53,6 +53,7 @@ class Sender() {
 
   public func expect(st : StreamSender.Status, pos : Nat) : () {
     let cond = sender.status() == st and sender.received() == pos;
+    Debug.print(debug_show (sender.status(), sender.received()));
     if (not cond) correct := false;
   };
 
@@ -162,6 +163,30 @@ do {
   chunk[1].release(#gap);
   await result[1];
   s.expect(#ready 0, 0);
+
+  s.assert_();
+};
+
+do {
+  let s = Sender();
+  let N = StreamSender.MAX_CONCURRENT_CHUNKS_DEFAULT;
+  let chunk = Array.tabulate<Chunk>(N, func(i) = Chunk());
+  var result = Array.init<async ()>(chunk.size(), async ());
+
+  for (i in Iter.range(0, N - 2)) {
+    result[i] := s.send(chunk[i]);
+    await async {};
+    s.expect(#ready(i + 1), 0);
+  };
+  
+  result[N - 1] := s.send(chunk[N - 1]);
+  await async {};
+  s.expect(#busy, 0);
+
+  for (i in Iter.range(0, N - 1)) {
+    chunk[i].release(#ok);
+    await result[i];
+  };
 
   s.assert_();
 };

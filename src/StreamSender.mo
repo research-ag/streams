@@ -32,6 +32,8 @@ module {
   // S = stream item type
   public type Status = { #shutdown; #stopped; #paused; #busy; #ready : Nat };
 
+  public let MAX_CONCURRENT_CHUNKS_DEFAULT = 5;
+
   public class StreamSender<T, S>(
     counterCreator : () -> { accept(item : T) : ?S },
     sendFunc : (x : Types.ChunkMsg<S>) -> async* Types.ControlMsg,
@@ -41,8 +43,6 @@ module {
       keepAliveSeconds : ?Nat;
     },
   ) {
-    let MAX_CONCURRENT_CHUNKS_DEFAULT = 5;
-
     let buffer = SWB.SlidingWindowBuffer<T>();
 
     let settings_ = {
