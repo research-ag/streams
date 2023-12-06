@@ -187,6 +187,10 @@ actor A {
     sender.received() == l[2] and
     sender.busyLevel() == l[3];
   };
+  
+  public query func isShutdown() : async Bool {
+    sender.isShutdown();
+  };
 };
 
 // Part 1: messages arrive and return one by one
@@ -266,4 +270,7 @@ assert await b2;
 assert await b3;
 ignore A.trigger();
 ignore A.trigger();
-await A.isState([12,12,12,0]);
+await async {};
+assert await A.isState([12,12,12,0]);
+ 
+assert not (await A.isShutdown());
