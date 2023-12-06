@@ -6,5 +6,9 @@ module {
       #ping;
     },
   );
+  // public type ChunkMsg<T> = {
+  //   #chunk : (Nat, [T]);
+  //   #ping;
+  // };
   public type ControlMsg = { #ok; #gap; #stop };
-}
+};

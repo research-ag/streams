@@ -53,7 +53,6 @@ class Sender() {
 
   public func expect(st : StreamSender.Status, pos : Nat) : () {
     let cond = sender.status() == st and sender.received() == pos;
-    Debug.print(debug_show (sender.status(), sender.received()));
     if (not cond) correct := false;
   };
 
