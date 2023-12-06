@@ -78,26 +78,26 @@ module {
     };
 
     /// Get the stream sender's status for inspection.
-    /// 
+    ///
     /// The function is sychronous. It can be used (optionally) by the user of
     /// the class before calling the asynchronous function sendChunk.
-    /// 
+    ///
     /// sendChunk will attempt to send a chunk if and only if the status is
     /// #ready.  sendChunk will throw if and only if the status is #stopped,
     /// #paused or #busy.
-    /// 
+    ///
     /// #stopped means that the stream sender was stopped by the receiver, e.g.
     /// due to a timeout.
-    /// 
+    ///
     /// #paused means that at least one chunk could not be delivered and the
     /// stream sender is waiting for outstanding responses to come back before
     /// it can resume sending chunks. When it resumes it will start from the
     /// first item that did not arrive.
-    /// 
+    ///
     /// #busy means that there are too many chunk concurrently in flight. The
     /// sender is waiting for outstanding responses to come back before sending
     /// any new chunks.
-    /// 
+    ///
     /// #ready n means that the stream sender is ready to send a chunk starting
     /// from position n.
 
@@ -111,14 +111,14 @@ module {
     };
 
     /// Send chunk to the receiver
-    /// 
+    ///
     /// A return value () means that the stream sender was ready to send the
     /// chunk and attempted to send it. It does not mean that the chunk was
     /// delivered to the receiver.
-    /// 
+    ///
     /// If the stream sender is not ready (stopped, paused or busy) then the
     /// function throws immediately and does not attempt to send the chunk.
-    
+
     public func sendChunk() : async* () {
       let start = switch (status()) {
         case (#shutdown) throw Error.reject("Sender shut down");
@@ -171,44 +171,60 @@ module {
         if (concurrentChunks == 0) paused := false;
       };
 
-      try {
-        switch (await* sendFunc(chunkMsg)) {
-          case (#ok) {
-            if (start >= buffer.start()) {
-              assert_(not stopped);  
-            };
-            assert_(head >= end);
-            buffer.deleteTo(end);
-          };
-          case (#stop) {
-            assert_(start >= buffer.start());
-            assert_(not stopped); // the receiver sends only one stop, then gap for all later chunks 
-            assert_(head >= end);
-            stopped := true;
-            buffer.deleteTo(start);
-            head := start;
-          };
-          case (#gap) {
-            assert_(start > buffer.start()); // there must have been at least one error before any gap
-            paused := true;
-            head := Nat.min(head, start);
-          };
+      func assertions(res : { #ok; #gap; #stop; #error }) {
+        // start
+        switch (res) {
+          case (#gap or #stop or #error) assert_(buffer.start() <= start);
+          case (_) {};
         };
+        // head
+        switch (res) {
+          case (#ok or #stop) assert_(end <= head);
+          case (#gap) if (start < head) assert_(end <= head);
+          case (_) {};
+        };
+        // state
+        switch (res) {
+          case (#ok) if (stopped) assert_(end <= buffer.start());
+          case (#gap or #error) if (not paused) assert (end <= head);
+          case (_) {};
+        };
+      };
+
+      let res = try {
+        await* sendFunc(chunkMsg);
       } catch (e) {
-        assert_(start >= buffer.start());
-        paused := true;
-        head := Nat.min(head, start);
+        // shutdown on permanent system errors
         switch (Error.code(e)) {
           case (#system_fatal or #destination_invalid or #future _) shutdown := true;
-          case (#call_error _ or #canister_error) {}; // these have been handled above
-          case (#system_transient) { /* TBD: might want to count these here and eventually shut down */ };
-          case (#canister_reject) {}; 
-          // Note: The IC protocol currently produces canister_reject if the
-          // receiver is stopping. Hence we do nothing here. However, this is
-          // considered a bug and the IC will change to produce canister_error.
-          // When that happens we can shut down here because the receiver should
-          // never reject.
-        }
+          case (_) {};
+          // TODO: revisit #canister_reject after an IC protocol bug is fixed.
+          // Currently, a stopped receiver responds with #canister_reject.
+          // In the future it should be #canister_error.
+        };
+        #error;
+      };
+
+      assertions(res);
+
+      // advance the start pointer
+      switch (res) {
+        case (#ok) buffer.deleteTo(end);
+        case (#stop) buffer.deleteTo(start);
+        case (_) {};
+      };
+
+      // retreat the head pointer
+      switch (res) {
+        case (#gap or #stop or #error) head := Nat.min(head, start);
+        case (_) {};
+      };
+
+      // transition state
+      switch (res) {
+        case (#stop) stopped := true;
+        case (#gap or #error) paused := true;
+        case (_) {};
       };
       receive();
     };
