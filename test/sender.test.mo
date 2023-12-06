@@ -27,18 +27,10 @@ func create(maxLength : Nat) : (() -> { accept : (item : Text) -> ??Text }) {
   counter;
 };
 
-var trapped = false;
-func trap() {
-  // Note: The interpreter does not roll back state changes. Hence trapped := true
-  // will take effect despite the assert false.
-  trapped := true;
-  assert false;
-};
-func myassert(b : Bool) {
-  if (not b) {
-    Debug.print("==== assertion failure. Stopping test here. ====");
-    trap();
-  };
+var success = true; 
+func fail() {
+  Debug.print("==== assertion failure ====");
+  success := false;
 };
 
 // Note: A chunk response of #trap (aka canister_error) cannot be simulated with
@@ -51,13 +43,13 @@ class Chunk(name_ : Text) = {
   var response : ?ChunkResponse = null;
   public func name() : Text = name_;
   public func run() : async Types.ControlMsg {
-    while (response == null and not trapped) await async {};
+    while (response == null) await async {};
     switch (response) {
       case (? #ok) #ok;
       case (? #gap) #gap;
       case (? #stopped) #stopped;
       case (? #reject) throw Error.reject("");
-      case (null) #stopped;
+      case (null) Debug.trap("cannot happen");
     };
     // Note: In case null the test is aborted due to an assertion failure
     // elsewhere.  We make all chunk respond with #stopped as if the receiver
@@ -103,13 +95,12 @@ do {
 
   func expect(st : StreamSender.Status, pos : Nat) : () {
     Debug.print("expect " # debug_show st # " start= " # debug_show sender.received());
-    myassert(sender.status() == st);
-    myassert(sender.received() == pos);
+    if (not (sender.status() == st and sender.received() == pos)) fail();
   };
 
   for (i in Iter.range(1, 10)) {
     switch (sender.push("abc")) {
-      case (#err _) myassert(false);
+      case (#err _) fail();
       case (_) {};
     };
   };
@@ -140,4 +131,6 @@ do {
   r[5] := send(c[5]); await async {}; expect(#ready 3, 1); // send chunk 5
   c[4].respond(#ok); await r[4]; expect(#ready 3, 2); // return chunk 4
   c[5].respond(#ok); await r[5]; expect(#ready 3, 3); // return chunk 5
+
+  assert success;
 };
