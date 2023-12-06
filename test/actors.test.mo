@@ -55,12 +55,12 @@ actor B {
         Debug.print(str # "reject");
         throw Error.reject("failMode");
       };
-      case (#stopped) #stopped;
+      case (#stop) #stop;
     };
     switch (res) {
       case (#ok) str #= "#ok";
-      case (#stopped) str #= "#stopped";
       case (#gap) str #= "#gap"; 
+      case (#stop) str #= "#stop";
     };
     Debug.print(str);
     res;
@@ -75,15 +75,15 @@ actor B {
   };
 
   // simulate Errors
-  type FailMode = { #off; #reject; #stopped };
+  type FailMode = { #off; #reject; #stop };
   var mode : FailMode = #off;
   public func setFailMode(m : FailMode, n : Nat) : async () {
     if (n > 0) await setFailMode(m, n - 1) else {
       var str = ".   B failMode: ";
       switch (m) {
         case (#off) str #= "off";
-        case (#stopped) str #= "stopped";
         case (#reject) str #= "reject";
+        case (#stop) str #= "stopped";
       };
       Debug.print(str);
       mode := m;
@@ -134,8 +134,8 @@ actor A {
       let ret = await B.receive(m);
       switch (ret) {
         case (#ok) str #= "ok";
-        case (#stopped) str #= "stopped";
         case (#gap) str #= "gap";
+        case (#stop) str #= "stop";
       };
       Debug.print(str);
       return ret;
@@ -177,7 +177,7 @@ actor A {
     let t_ = t;
     t += 1;
     Debug.print("A trigger: " # Nat.toText(t_) # " ");
-    ignore await* sender.sendChunk();
+    await* sender.sendChunk();
     // Debug.print("A trigger: " # Nat.toText(t_) # " <-");
   };
 
@@ -187,6 +187,10 @@ actor A {
     sender.sent() == ?l[1] and
     sender.received() == l[2] and
     sender.busyLevel() == l[3];
+  };
+  
+  public query func isShutdown() : async Bool {
+    sender.isShutdown();
   };
 };
 
@@ -267,4 +271,7 @@ assert await b2;
 assert await b3;
 ignore A.trigger();
 ignore A.trigger();
-await A.isState([12,12,12,0]);
+await async {};
+assert await A.isState([12,12,12,0]);
+ 
+assert not (await A.isShutdown());

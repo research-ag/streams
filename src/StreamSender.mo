@@ -4,9 +4,10 @@ import R "mo:base/Result";
 import Time "mo:base/Time";
 import Array "mo:base/Array";
 import Option "mo:base/Option";
+import Nat "mo:base/Nat";
 import SWB "mo:swb";
 import Vector "mo:vector";
-import Types "Types";
+import Types "types";
 
 module {
   /// Usage:
@@ -26,6 +27,9 @@ module {
   /// await* sender.sendChunk(); // will send (123, [1..10], 0) to `anotherCanister`
   /// await* sender.sendChunk(); // will send (123, [11..12], 10) to `anotherCanister`
   /// await* sender.sendChunk(); // will do nothing, stream clean
+  public type ChunkMsg<T> = Types.ChunkMsg<T>;
+  public type ControlMsg = Types.ControlMsg;
+
   // T = queue item type
   // S = stream item type
   public type Status = { #stopped; #paused; #busy; #ready : Nat };
@@ -50,13 +54,19 @@ module {
     };
 
     var stopped = false;
-    var head : ?Nat = ?0;
+    var paused = false;
+    var head : Nat = 0;
     var lastChunkSent = Time.now();
     var concurrentChunks = 0;
+    var shutdown = false;
 
     func isQueueFull() : Bool = switch (settings_.maxQueueSize) {
       case (?max) buffer.len() >= max;
       case (null) false;
+    };
+
+    func assert_(condition : Bool) {
+      if (not condition) shutdown := true;
     };
 
     /// add item to the stream
@@ -93,11 +103,13 @@ module {
     /// #ready n means that the stream sender is ready to send a chunk starting
     /// from position n.
 
+    public type Status = { #shutdown; #stopped; #paused; #busy; #ready : Nat };
     public func status() : Status {
+      if (isShutdown()) return #shutdown;
       if (isStopped()) return #stopped;
-      let ?start = head else return #paused;
+      if (isPaused()) return #paused;
       if (isBusy()) return #busy;
-      return #ready start;
+      return #ready head;
     };
 
     /// Send chunk to the receiver
@@ -111,6 +123,7 @@ module {
 
     public func sendChunk() : async* () {
       let start = switch (status()) {
+        case (#shutdown) throw Error.reject("Sender shut down");
         case (#stopped) throw Error.reject("Stream stopped by receiver");
         case (#paused) throw Error.reject("Stream is paused");
         case (#busy) throw Error.reject("Stream is busy");
@@ -133,7 +146,7 @@ module {
             };
           };
         };
-        head := ?end;
+        head := end;
         Vector.toArray(vec);
       };
 
@@ -157,33 +170,64 @@ module {
       let end = start + elements.size();
       func receive() {
         concurrentChunks -= 1;
-        if (concurrentChunks == 0 and head == null) {
-          head := ?buffer.start();
+        if (concurrentChunks == 0) paused := false;
+      };
+
+      func assertions(res : { #ok; #gap; #stop; #error }) {
+        // start
+        switch (res) {
+          case (#gap or #stop or #error) assert_(buffer.start() <= start);
+          case (_) {};
+        };
+        // head
+        switch (res) {
+          case (#ok or #stop) assert_(end <= head);
+          case (#gap) if (start < head) assert_(end <= head);
+          case (_) {};
+        };
+        // state
+        switch (res) {
+          case (#ok) if (stopped) assert_(end <= buffer.start());
+          case (#gap or #error) if (not paused) assert (end <= head);
+          case (_) {};
         };
       };
 
-      try {
-        let result = await* sendFunc(chunkMsg);
-        switch (status()) {
-          case (#stopped) throw Error.reject("Stream stopped by receiver");
-          case (#paused) throw Error.reject("Stream is paused");
-          case (#busy) {};
-          case (#ready x) {};
+      let res = try {
+        await* sendFunc(chunkMsg);
+      } catch (e) {
+        // shutdown on permanent system errors
+        switch (Error.code(e)) {
+          case (#system_fatal or #destination_invalid or #future _) shutdown := true;
+          case (_) {};
+          // TODO: revisit #canister_reject after an IC protocol bug is fixed.
+          // Currently, a stopped receiver responds with #canister_reject.
+          // In the future it should be #canister_error.
         };
-        switch (result) {
-          case (#ok) {
-            if (head != ?end) {
-              throw Error.reject("Order of messages is broken");
-            };
-            buffer.deleteTo(end);
-          };
-          case (#stopped) {
-            stopped := true;
-            buffer.deleteTo(start);
-          };
-          case (#gap) head := null;
-        };
-      } catch (e) head := null;
+        #error;
+      };
+
+      assertions(res);
+
+      // advance the start pointer
+      switch (res) {
+        case (#ok) buffer.deleteTo(end);
+        case (#stop) buffer.deleteTo(start);
+        case (_) {};
+      };
+
+      // retreat the head pointer
+      switch (res) {
+        case (#gap or #stop or #error) head := Nat.min(head, start);
+        case (_) {};
+      };
+
+      // transition state
+      switch (res) {
+        case (#stop) stopped := true;
+        case (#gap or #error) paused := true;
+        case (_) {};
+      };
       receive();
     };
 
@@ -191,7 +235,7 @@ module {
     public func length() : Nat = buffer.end();
 
     /// amount of items, which were sent to receiver
-    public func sent() : ?Nat = head;
+    public func sent() : Nat = head;
 
     /// amount of items, successfully sent and acknowledged by receiver
     public func received() : Nat = buffer.start();
@@ -210,11 +254,14 @@ module {
     /// check busy level of sender, e.g. current amount of outgoing calls in flight
     public func busyLevel() : Nat = concurrentChunks;
 
+    /// returns flag is sender has shut down
+    public func isShutdown() : Bool = shutdown;
+
     /// returns flag is receiver stopped the stream
     public func isStopped() : Bool = stopped;
 
     /// check paused status of sender
-    public func isPaused() : Bool = head == null;
+    public func isPaused() : Bool = paused;
 
     /// update max queue size
     public func setMaxQueueSize(value : ?Nat) {

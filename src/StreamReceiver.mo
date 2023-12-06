@@ -3,7 +3,7 @@ import Error "mo:base/Error";
 import R "mo:base/Result";
 import Array "mo:base/Array";
 import SWB "mo:swb";
-import Types "Types";
+import Types "types";
 
 module {
 
@@ -24,6 +24,8 @@ module {
   /// The function `onChunk` throws in case of a gap (= broken pipe). The
   /// calling code should not catch the throw so that it gets passed through to
   /// the enclosing async expression of the calling code.
+  public type ChunkMsg<T> = Types.ChunkMsg<T>;
+  public type ControlMsg = Types.ControlMsg;
   public type Timeout = (Nat, () -> Int);
   public class StreamReceiver<T>(
     startPos : Nat,
@@ -54,7 +56,7 @@ module {
     public func onChunk(cm : Types.ChunkMsg<T>) : Types.ControlMsg {
       let (start, msg) = cm;
       if (start != length_) return #gap;
-      if (hasTimedOut()) return #stopped;
+      if (hasTimedOut()) return #stop;
       switch (msg) {
         case (#chunk ch) {
           for (i in ch.keys()) {
