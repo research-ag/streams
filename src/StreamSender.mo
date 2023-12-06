@@ -32,7 +32,7 @@ module {
       #ping;
     },
   );
-  public type ControlMsg = { #stopped; #ok; #gap };
+  public type ControlMsg = { #ok; #gap; #stop };
 
   // T = queue item type
   // S = stream item type
@@ -171,7 +171,7 @@ module {
       try {
         switch (await* sendFunc(chunkMsg)) {
           case (#ok) buffer.deleteTo(end);
-          case (#stopped) {
+          case (#stop) {
             stopped := true;
             buffer.deleteTo(start);
           };

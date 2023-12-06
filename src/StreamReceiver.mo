@@ -30,7 +30,7 @@ module {
       #ping;
     },
   );
-  public type ControlMsg = { #stopped; #ok; #gap };
+  public type ControlMsg = { #ok; #gap; #stop };
   public type Timeout = (Nat, () -> Int);
   public class StreamReceiver<T>(
     startPos : Nat,
@@ -61,7 +61,7 @@ module {
     public func onChunk(cm : ChunkMsg<T>) : ControlMsg {
       let (start, msg) = cm;
       if (start != length_) return #gap;
-      if (hasTimedOut()) return #stopped;
+      if (hasTimedOut()) return #stop;
       switch (msg) {
         case (#chunk ch) {
           for (i in ch.keys()) {
