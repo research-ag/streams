@@ -9,7 +9,7 @@ import Base "sender.base";
 // Note: A chunk response of #trap (aka canister_error) cannot be simulated with
 // the moc interpreter. Calling Debug.trap() to generate the error would
 // instantly terminate the whole test.
-type ChunkResponse = { #ok; #gap; #stopped; #reject };
+type ChunkResponse = { #ok; #gap; #stop; #reject };
 
 class Chunk() {
   var response : ?ChunkResponse = null;
@@ -19,7 +19,7 @@ class Chunk() {
     switch (response) {
       case (? #ok) #ok;
       case (? #gap) #gap;
-      case (? #stopped) #stop;
+      case (? #stop) #stop;
       case (? #reject) throw Error.reject("");
       case (null) Debug.trap("cannot happen");
     };
@@ -30,6 +30,7 @@ class Chunk() {
 
 class Sender() {
   var chunkRegister : Chunk = Chunk();
+  var correct = true;
 
   func sendChunkMsg(message : Types.ChunkMsg<?Text>) : async* Types.ControlMsg {
     let chunk = chunkRegister;
@@ -50,9 +51,14 @@ class Sender() {
     await* sender.sendChunk();
   };
 
-  public func expect(st : StreamSender.Status, pos : Nat) : async () {
-    assert sender.status() == st;
-    assert sender.received() == pos;
+  public func expect(st : StreamSender.Status, pos : Nat) : () {
+    let cond = sender.status() == st and sender.received() == pos;
+    Debug.print(debug_show (sender.status(), sender.received()));
+    if (not cond) correct := false;
+  };
+
+  public func assert_() {
+    assert correct;
   };
 
   for (i in Iter.range(1, 10)) {
@@ -71,56 +77,92 @@ do {
   var result = Array.init<async ()>(chunk.size(), async ());
 
   result[0] := s.send(chunk[0]);
-  await s.expect(#ready 1, 0);
+  await async {};
+  s.expect(#ready 1, 0);
 
   result[1] := s.send(chunk[1]);
-  await s.expect(#ready 2, 0);
+  await async {};
+  s.expect(#ready 2, 0);
 
   chunk[0].release(#ok);
   await result[0];
-  await s.expect(#ready 2, 1);
+  s.expect(#ready 2, 1);
 
   chunk[1].release(#ok);
   await result[1];
-  await s.expect(#ready 2, 2);
+  s.expect(#ready 2, 2);
+
+  s.assert_();
 };
 
-// do {
-//   let s = Sender();
-//   let chunk = Array.tabulate<Chunk>(2, func(i) = Chunk());
-//   var result = Array.init<async ()>(chunk.size(), async ());
+do {
+  let s = Sender();
+  let chunk = Array.tabulate<Chunk>(2, func(i) = Chunk());
+  var result = Array.init<async ()>(chunk.size(), async ());
 
-//   result[0] := s.send(chunk[0]);
-//   await s.expect(#ready 1, 0);
+  result[0] := s.send(chunk[0]);
+  await async {};
+  s.expect(#ready 1, 0);
 
-//   result[1] := s.send(chunk[1]);
-//   await s.expect(#ready 2, 0);
+  result[1] := s.send(chunk[1]);
+  await async {};
+  s.expect(#ready 2, 0);
 
-//   chunk[0].release(#stopped);
-//   await result[0];
-//   await s.expect(#ready 2, 1);
+  chunk[0].release(#stop);
+  await result[0];
+  s.expect(#stopped, 0);
 
-//   chunk[1].release(#ok);
-//   await result[1];
-//   await s.expect(#ready 2, 2);
-// };
+  chunk[1].release(#ok);
+  await result[1];
+  s.expect(#shutdown, 2);
 
-// do {
-//   let s = Sender();
-//   let chunk = Array.tabulate<Chunk>(2, func(i) = Chunk());
-//   var result = Array.init<async ()>(chunk.size(), async ());
-  
-//   result[0] := s.send(chunk[0]);
-//   await s.expect(#ready 1, 0);
+  s.assert_();
+};
 
-//   result[1] := s.send(chunk[1]);
-//   await s.expect(#ready 2, 0);
+do {
+  let s = Sender();
+  let chunk = Array.tabulate<Chunk>(2, func(i) = Chunk());
+  var result = Array.init<async ()>(chunk.size(), async ());
 
-//   chunk[0].release(#gap);
-//   await result[0];
-//   await s.expect(#paused, );
+  result[0] := s.send(chunk[0]);
+  await async {};
+  s.expect(#ready 1, 0);
 
-//   chunk[1].release(#gap);
-//   await result[1];
-//   await s.expect(#paused, );
-// };
+  result[1] := s.send(chunk[1]);
+  await async {};
+  s.expect(#ready 2, 0);
+
+  chunk[0].release(#gap);
+  await result[0];
+  s.expect(#paused, 0);
+
+  chunk[1].release(#gap);
+  await result[1];
+  s.expect(#ready 0, 0);
+
+  s.assert_();
+};
+
+do {
+  let s = Sender();
+  let chunk = Array.tabulate<Chunk>(2, func(i) = Chunk());
+  var result = Array.init<async ()>(chunk.size(), async ());
+
+  result[0] := s.send(chunk[0]);
+  await async {};
+  s.expect(#ready 1, 0);
+
+  result[1] := s.send(chunk[1]);
+  await async {};
+  s.expect(#ready 2, 0);
+
+  chunk[0].release(#reject);
+  await result[0];
+  s.expect(#paused, 0);
+
+  chunk[1].release(#gap);
+  await result[1];
+  s.expect(#ready 0, 0);
+
+  s.assert_();
+};

@@ -184,7 +184,7 @@ actor A {
   public query func isState(l : [Nat]) : async Bool {
     Debug.print("A isState: " # debug_show(l));
     sender.length() == l[0] and
-    sender.sent() == ?l[1] and
+    sender.sent() == l[1] and
     sender.received() == l[2] and
     sender.busyLevel() == l[3];
   };

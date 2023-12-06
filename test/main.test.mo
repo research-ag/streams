@@ -78,7 +78,7 @@ let n = sender.length();
 var i = 0;
 let max = 100;
 while (sender.received() < n and i < max) {
-  ignore await* sender.sendChunk();
+  await* sender.sendChunk();
   i += 1;
 }; 
 Debug.print("sent " # Nat.toText(i) # " chunks");
