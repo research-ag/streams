@@ -129,6 +129,11 @@ func test(sequence : [Item]) : async () {
   s.assert_();
 };
 
+await test([(0, #ok, #ready 1, 1)]);
+await test([(0, #gap, #ready 0, 0)]);
+await test([(0, #reject, #ready 0, 0)]);
+await test([(0, #stop, #stopped, 0)]);
+
 await test([
   (0, #ok, #ready 2, 1),
   (1, #ok, #ready 2, 2),
