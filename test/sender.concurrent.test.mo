@@ -25,10 +25,13 @@ class Chunk() {
     };
   };
 
-  public func release(result : ChunkResponse) = response := ?result;
+  public func release(result : ChunkResponse) {
+    assert response == null;
+    response := ?result;
+  };
 };
 
-class Sender() {
+class Sender(n : Nat) {
   var chunkRegister : Chunk = Chunk();
   var correct = true;
 
@@ -36,8 +39,9 @@ class Sender() {
     let chunk = chunkRegister;
     await chunk.run();
   };
+
   let sender = StreamSender.StreamSender<Text, ?Text>(
-    Base.create(5),
+    Base.create(1),
     sendChunkMsg,
     {
       maxQueueSize = null;
@@ -61,8 +65,8 @@ class Sender() {
     assert correct;
   };
 
-  for (i in Iter.range(1, 10)) {
-    Result.assertOk(sender.push("abc"));
+  for (i in Iter.range(1, n)) {
+    Result.assertOk(sender.push("a"));
   };
 };
 
@@ -71,105 +75,83 @@ class Sender() {
 // global result[] array from within a function either. That's why it is hard to
 // shorten the commands below with any kind of convenience function.
 
-do {
-  let s = Sender();
-  let chunk = Array.tabulate<Chunk>(2, func(i) = Chunk());
-  var result = Array.init<async ()>(chunk.size(), async ());
+type ItemA = ({ #send; #release : (Nat, ChunkResponse) }, StreamSender.Status, Nat);
 
-  result[0] := s.send(chunk[0]);
-  await async {};
-  s.expect(#ready 1, 0);
+// The sequence should be correct, otherwise eternal cycle.
+func test_arbitrary(sequence : [ItemA]) : async () {
+  let n = Iter.size(Iter.filter(sequence.vals(), func(a : ItemA) : Bool = a.0 == #send));
 
-  result[1] := s.send(chunk[1]);
-  await async {};
-  s.expect(#ready 2, 0);
+  let s = Sender(n);
 
-  chunk[0].release(#ok);
-  await result[0];
-  s.expect(#ready 2, 1);
-
-  chunk[1].release(#ok);
-  await result[1];
-  s.expect(#ready 2, 2);
-
+  let chunk = Array.tabulate<Chunk>(n, func(i) = Chunk());
+  var result = Array.init<async ()>(n, async ());
+  var i = 0;
+  for (item in sequence.vals()) {
+    let (command, status, pos) = item;
+    switch (command) {
+      case (#send) {
+        result[i] := s.send(chunk[i]);
+        await async {};
+        i += 1;
+      };
+      case (#release(j, response)) {
+        chunk[j].release(response);
+        await result[j];
+      };
+    };
+    s.expect(status, pos);
+  };
   s.assert_();
 };
 
-do {
-  let s = Sender();
-  let chunk = Array.tabulate<Chunk>(2, func(i) = Chunk());
-  var result = Array.init<async ()>(chunk.size(), async ());
+type Item = (index : Nat, ChunkResponse, StreamSender.Status, received : Nat);
 
-  result[0] := s.send(chunk[0]);
-  await async {};
-  s.expect(#ready 1, 0);
+// The sequence should be correct, otherwise eternal cycle.
+func test(sequence : [Item]) : async () {
+  let n = sequence.size();
+  let s = Sender(n);
 
-  result[1] := s.send(chunk[1]);
-  await async {};
-  s.expect(#ready 2, 0);
+  let chunk = Array.tabulate<Chunk>(n, func(i) = Chunk());
+  var result = Array.init<async ()>(n, async ());
 
-  chunk[0].release(#stop);
-  await result[0];
-  s.expect(#stopped, 0);
+  for (i in Iter.range(0, n - 1)) {
+    result[i] := s.send(chunk[i]);
+    await async {};
+    s.expect(#ready(i + 1), 0);
+  };
 
-  chunk[1].release(#ok);
-  await result[1];
-  s.expect(#shutdown, 2);
-
+  for (item in sequence.vals()) {
+    let (index, response, status, pos) = item;
+    chunk[index].release(response);
+    await result[index];
+    s.expect(status, pos);
+  };
   s.assert_();
 };
 
-do {
-  let s = Sender();
-  let chunk = Array.tabulate<Chunk>(2, func(i) = Chunk());
-  var result = Array.init<async ()>(chunk.size(), async ());
+await test([
+  (0, #ok, #ready 2, 1),
+  (1, #ok, #ready 2, 2),
+]);
 
-  result[0] := s.send(chunk[0]);
-  await async {};
-  s.expect(#ready 1, 0);
+await test([
+  (0, #stop, #stopped, 0),
+  (1, #ok, #shutdown, 2),
+]);
 
-  result[1] := s.send(chunk[1]);
-  await async {};
-  s.expect(#ready 2, 0);
+await test([
+  (0, #gap, #paused, 0),
+  (1, #gap, #ready 0, 0),
+]);
 
-  chunk[0].release(#gap);
-  await result[0];
-  s.expect(#paused, 0);
-
-  chunk[1].release(#gap);
-  await result[1];
-  s.expect(#ready 0, 0);
-
-  s.assert_();
-};
+await test([
+  (0, #reject, #paused, 0),
+  (1, #gap, #ready 0, 0),
+]);
 
 do {
-  let s = Sender();
-  let chunk = Array.tabulate<Chunk>(2, func(i) = Chunk());
-  var result = Array.init<async ()>(chunk.size(), async ());
-
-  result[0] := s.send(chunk[0]);
-  await async {};
-  s.expect(#ready 1, 0);
-
-  result[1] := s.send(chunk[1]);
-  await async {};
-  s.expect(#ready 2, 0);
-
-  chunk[0].release(#reject);
-  await result[0];
-  s.expect(#paused, 0);
-
-  chunk[1].release(#gap);
-  await result[1];
-  s.expect(#ready 0, 0);
-
-  s.assert_();
-};
-
-do {
-  let s = Sender();
   let N = StreamSender.MAX_CONCURRENT_CHUNKS_DEFAULT;
+  let s = Sender(N);
   let chunk = Array.tabulate<Chunk>(N, func(i) = Chunk());
   var result = Array.init<async ()>(chunk.size(), async ());
 
@@ -178,7 +160,7 @@ do {
     await async {};
     s.expect(#ready(i + 1), 0);
   };
-  
+
   result[N - 1] := s.send(chunk[N - 1]);
   await async {};
   s.expect(#busy, 0);
@@ -186,6 +168,7 @@ do {
   for (i in Iter.range(0, N - 1)) {
     chunk[i].release(#ok);
     await result[i];
+    s.expect(#ready N, i + 1);
   };
 
   s.assert_();
