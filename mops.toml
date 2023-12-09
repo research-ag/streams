@@ -8,8 +8,8 @@ license = "Apache-2.0"
 
 [dependencies]
 base = "0.10.2"
-swb = "1.0.0"
+swb = "1.0.1"
 vector = "0.2.0"
 
 [dev-dependencies]
-test = "1.1.1"
+test = "1.2.0"
