@@ -77,7 +77,8 @@ class Sender(n : Nat) {
 
 type ItemA = ({ #send; #release : (Nat, ChunkResponse) }, StreamSender.Status, Nat);
 
-// The sequence should be correct, otherwise eternal cycle.
+// The caller must ensure the sequence is correct.
+// All chunks that get sent must be released or the test won't terminate.
 func test_arbitrary(sequence : [ItemA]) : async () {
   let n = Iter.size(Iter.filter(sequence.vals(), func(a : ItemA) : Bool = a.0 == #send));
 
@@ -106,7 +107,10 @@ func test_arbitrary(sequence : [ItemA]) : async () {
 
 type Item = (index : Nat, ChunkResponse, StreamSender.Status, received : Nat);
 
-// The sequence should be correct, otherwise eternal cycle.
+// With this function tests all sends happen first.
+// Then responses can be released in arbitrary order.
+// The caller must still ensure the sequence is correct.
+// All chunks that get sent must be released or the test won't terminate.
 func test(sequence : [Item]) : async () {
   let n = sequence.size();
   let s = Sender(n);
@@ -129,10 +133,36 @@ func test(sequence : [Item]) : async () {
   s.assert_();
 };
 
-await test([(0, #ok, #ready 1, 1)]);
-await test([(0, #gap, #ready 0, 0)]);
-await test([(0, #reject, #ready 0, 0)]);
-await test([(0, #stop, #stopped, 0)]);
+// single chunk starting from #ready state
+do {
+  let tests = [
+    (#ok, #ready 1, 1),
+    (#gap, #ready 0, 0),
+    (#reject, #ready 0, 0),
+    (#stop, #stopped, 0),
+  ];
+  for (t in tests.vals()) {
+    let (response, status, pos) = t;
+    await test([(0, response, status, pos)]);
+  };
+};
+
+// single chunk from #stopped state
+do {
+  let tests = [
+    (#ok, #shutdown, 2),
+    (#gap, #stopped, 0),
+    (#reject, #stopped, 0),
+    (#stop, #shutdown, 1),
+  ];
+  for (t in tests.vals()) {
+    let (response, status, pos) = t;
+    await test([
+      (0, #stop, #stopped, 0),
+      (1, response, status, pos),
+    ]);
+  };
+};
 
 await test([
   (0, #ok, #ready 2, 1),
