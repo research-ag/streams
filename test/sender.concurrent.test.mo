@@ -133,7 +133,7 @@ func test(sequence : [Item]) : async () {
   s.assert_();
 };
 
-// single chunk starting from #ready state
+// single chunk starting from the #ready state
 do {
   let tests = [
     (#ok, #ready 1, 1),
@@ -147,7 +147,7 @@ do {
   };
 };
 
-// single chunk from #stopped state
+// single chunk starting from the #stopped state
 do {
   let tests = [
     (#ok, #shutdown, 2),
@@ -164,6 +164,7 @@ do {
   };
 };
 
+// two concurrent chunks respond in order
 await test([
   (0, #ok, #ready 2, 1),
   (1, #ok, #ready 2, 2),
@@ -184,6 +185,36 @@ await test([
   (1, #gap, #ready 0, 0),
 ]);
 
+// two concurrent chunks respond in reverse order
+do {
+  let tests = [
+    ([#ok, #ok], [(#ready 2, 2), (#ready 2, 2)]),
+    ([#ok, #gap], [(#paused, 0), (#ready 1, 1)]),
+    ([#ok, #reject], [(#paused, 0), (#ready 1, 1)]),
+    ([#ok, #stop], [(#stopped, 1), (#stopped, 1)]),
+    ([#gap, #ok], [(#ready 2, 2), (#shutdown, 2)]),
+    ([#gap, #gap], [(#paused, 0), (#ready 0, 0)]),
+    ([#gap, #reject], [(#paused, 0), (#ready 0, 0)]),
+    ([#gap, #stop], [(#stopped, 1), (#shutdown, 1)]),
+    ([#reject, #ok], [(#ready 2, 2), (#shutdown, 2)]),
+    ([#reject, #gap], [(#paused, 0), (#ready 0, 0)]),
+    ([#reject, #reject], [(#paused, 0), (#ready 0, 0)]),
+    ([#reject, #stop], [(#stopped, 1), (#shutdown, 1)]),
+    ([#stop, #ok], [(#ready 2, 2), (#shutdown, 2)]),
+    ([#stop, #gap], [(#paused, 0), (#stopped, 0)]),
+    ([#stop, #reject], [(#paused, 0), (#stopped, 0)]),
+    ([#stop, #stop], [(#stopped, 1), (#shutdown, 1)]),
+  ];
+  for (t in tests.vals()) {
+    let (responses, statuses) = t;
+    await test([
+      (1, responses[1], statuses[0].0, statuses[0].1),
+      (0, responses[0], statuses[1].0, statuses[1].1),
+    ]);
+  };
+};
+
+// reach the #busy state
 do {
   let N = StreamSender.MAX_CONCURRENT_CHUNKS_DEFAULT;
   let s = Sender(N);

@@ -10,6 +10,7 @@ import Debug "mo:base/Debug";
 import Error "mo:base/Error";
 import Base "sender.base";
 
+// sequential successful sends, chunk length = 1
 do {
   let N = 26;
   let array = Array.tabulate<Text>(N, func(i) = "ab" # Char.toText(Char.fromNat32(Nat32.fromNat(i))));
@@ -41,6 +42,7 @@ do {
   };
 };
 
+// sequential successful sends, chunk length = 2
 do {
   let N = 26;
   let array = Array.tabulate<Text>(N, func(i) = "ab" # Char.toText(Char.fromNat32(Nat32.fromNat(i))));
@@ -73,6 +75,7 @@ do {
   };
 };
 
+// #stop response
 do {
   func send(message : Types.ChunkMsg<?Text>) : async* Types.ControlMsg {
     #stop;
@@ -92,6 +95,7 @@ do {
   assert sender.status() == #stopped;
 };
 
+// #gap response
 do {
   func send(message : Types.ChunkMsg<?Text>) : async* Types.ControlMsg {
     #gap;

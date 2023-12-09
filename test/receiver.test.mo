@@ -1,5 +1,6 @@
 import StreamReceiver "../src/StreamReceiver";
 
+// test index counter and gap detection
 do {
   var size = 0;
   func process(index : Nat, item : Text) {
@@ -11,12 +12,15 @@ do {
 
   assert receiver.onChunk((0, #chunk(["abc"]))) == #ok;
   assert receiver.onChunk((0, #chunk(["abc"]))) == #gap;
-  assert receiver.onChunk((1, #chunk(["abc"]))) == #ok;
-  assert receiver.onChunk((1, #chunk(["abc"]))) == #gap;
-  assert receiver.onChunk((2, #chunk(["abc"]))) == #ok;
   assert receiver.onChunk((2, #chunk(["abc"]))) == #gap;
+  assert receiver.onChunk((1, #chunk(["abc","abc"]))) == #ok;
+  assert receiver.onChunk((1, #chunk(["abc"]))) == #gap;
+  assert receiver.onChunk((2, #chunk(["abc"]))) == #gap;
+  assert receiver.onChunk((4, #chunk(["abc"]))) == #gap;
+  assert receiver.onChunk((3, #chunk(["abc"]))) == #ok;
 };
 
+// test timeout detection 
 do {
   var size = 0;
   func process(index : Nat, item : Text) {
@@ -31,6 +35,8 @@ do {
   assert receiver.lastChunkReceived() == 0;
 
   time := 1;
+  assert receiver.onChunk((0, #chunk(["abc"]))) == #gap;
+  assert receiver.lastChunkReceived() == 0;
   assert receiver.onChunk((1, #chunk(["abc"]))) == #ok;
   assert receiver.lastChunkReceived() == 1;
 
@@ -38,6 +44,6 @@ do {
   assert receiver.onChunk((2, #ping)) == #ok;
   assert receiver.lastChunkReceived() == 2;
 
-  time := 5;
+  time := 4;
   assert receiver.onChunk((2, #chunk(["abc"]))) == #stop;
 };
