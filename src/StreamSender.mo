@@ -185,7 +185,7 @@ module {
         // state
         switch (res) {
           case (#ok) if (stopped) assert_(end <= buffer.start());
-          case (#gap or #error) if (not paused) assert (end <= head);
+          case (#gap or #error) if (not (paused or stopped)) assert_ (end <= head);
           case (_) {};
         };
       };
