@@ -200,6 +200,11 @@ module {
           // TODO: revisit #canister_reject after an IC protocol bug is fixed.
           // Currently, a stopped receiver responds with #canister_reject.
           // In the future it should be #canister_error.
+          //
+          // However, there is an advantage of handling #canister_reject and
+          // #canister_error equally. It becomes easier to test because in the
+          // moc interpreter we can simulate #canister_reject but not
+          // #canister_error.
         };
         #error;
       };

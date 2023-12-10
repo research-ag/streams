@@ -12,7 +12,9 @@ do {
 
   assert receiver.onChunk((0, #chunk(["abc"]))) == #ok;
   assert receiver.onChunk((0, #chunk(["abc"]))) == #gap;
+  assert receiver.onChunk((0, #ping)) == #gap;
   assert receiver.onChunk((2, #chunk(["abc"]))) == #gap;
+  assert receiver.onChunk((2, #ping)) == #gap;
   assert receiver.onChunk((1, #chunk(["abc","abc"]))) == #ok;
   assert receiver.onChunk((1, #chunk(["abc"]))) == #gap;
   assert receiver.onChunk((2, #chunk(["abc"]))) == #gap;
