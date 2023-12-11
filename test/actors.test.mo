@@ -8,8 +8,8 @@ import Nat "mo:base/Nat";
 import Types "../src/types";
 
 // types for receiver actor
-type ChunkMsg = Types.ChunkMsg<?Text>;
-type ControlMsg = Types.ControlMsg;
+type ChunkMessage = Types.ChunkMessage<?Text>;
+type ControlMessage = Types.ControlMessage;
 
 // receiver actor
 actor B {
@@ -35,7 +35,7 @@ actor B {
 
   // required top-level boilerplate code,
   // a pass-through to StreamReceiver
-  public func receive(m : ChunkMsg) : async ControlMsg {
+  public func receive(m : ChunkMessage) : async ControlMessage {
     let start = m.0;
     var end = m.0;
     var str = ".   B recv: (" # Nat.toText(m.0) # ", ";
@@ -117,7 +117,7 @@ actor A {
   // We can place additional code here, for example, for logging.
   // However, we must not catch and convert any Errors. The Errors from
   // `await r` must be passed through unaltered or the StreamSender may break.
-  func sendToReceiver(m : ChunkMsg) : async* ControlMsg {
+  func sendToReceiver(m : ChunkMessage) : async* ControlMessage {
     let start = m.0;
     var end = m.0;
     var str = "A send: (" # Nat.toText(m.0) # ", ";

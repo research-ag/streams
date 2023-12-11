@@ -1,5 +1,4 @@
 import StreamSender "../src/StreamSender";
-import Types "../src/types";
 import Result "mo:base/Result";
 import Debug "mo:base/Debug";
 import Error "mo:base/Error";
@@ -14,7 +13,7 @@ type ChunkResponse = { #ok; #gap; #stop; #reject };
 class Chunk() {
   var response : ?ChunkResponse = null;
 
-  public func run() : async Types.ControlMsg {
+  public func run() : async StreamSender.ControlMessage {
     while (response == null) await async {};
     switch (response) {
       case (? #ok) #ok;
@@ -35,14 +34,14 @@ class Sender(n : Nat) {
   var chunkRegister : Chunk = Chunk();
   var correct = true;
 
-  func sendChunkMsg(message : Types.ChunkMsg<?Text>) : async* Types.ControlMsg {
+  func sendChunkMessage(message : StreamSender.ChunkMessage<?Text>) : async* StreamSender.ControlMessage {
     let chunk = chunkRegister;
     await chunk.run();
   };
 
   let sender = StreamSender.StreamSender<Text, ?Text>(
     Base.create(1),
-    sendChunkMsg,
+    sendChunkMessage,
     {
       maxQueueSize = null;
       maxConcurrentChunks = null;
@@ -55,9 +54,9 @@ class Sender(n : Nat) {
     await* sender.sendChunk();
   };
 
-  public func expect(st : StreamSender.Status, pos : Nat) : () {
-    let cond = sender.status() == st and sender.received() == pos;
-    Debug.print(debug_show (sender.status(), sender.received()));
+  public func expect(st : StreamSender.Status, received : Nat, sent : Nat) : () {
+    let cond = sender.status() == st and sender.received() == received and sender.sent() == sent;
+    //Debug.print(debug_show (sender.status(), sender.received(), sender.sent()));
     if (not cond) correct := false;
   };
 
@@ -75,7 +74,7 @@ class Sender(n : Nat) {
 // global result[] array from within a function either. That's why it is hard to
 // shorten the commands below with any kind of convenience function.
 
-type ItemA = ({ #send; #release : (Nat, ChunkResponse) }, StreamSender.Status, Nat);
+type ItemA = ({ #send; #release : (Nat, ChunkResponse) }, StreamSender.Status, Nat, Nat);
 
 // The caller must ensure the sequence is correct.
 // All chunks that get sent must be released or the test won't terminate.
@@ -88,7 +87,7 @@ func test_arbitrary(sequence : [ItemA]) : async () {
   var result = Array.init<async ()>(n, async ());
   var i = 0;
   for (item in sequence.vals()) {
-    let (command, status, pos) = item;
+    let (command, status, received, sent) = item;
     switch (command) {
       case (#send) {
         result[i] := s.send(chunk[i]);
@@ -100,12 +99,12 @@ func test_arbitrary(sequence : [ItemA]) : async () {
         await result[j];
       };
     };
-    s.expect(status, pos);
+    s.expect(status, received, sent);
   };
   s.assert_();
 };
 
-type Item = (index : Nat, ChunkResponse, StreamSender.Status, received : Nat);
+type Item = (index : Nat, ChunkResponse, StreamSender.Status, received : Nat, sent : Nat);
 
 // With this function tests all sends happen first.
 // Then responses can be released in arbitrary order.
@@ -121,14 +120,14 @@ func test(sequence : [Item]) : async () {
   for (i in Iter.range(0, n - 1)) {
     result[i] := s.send(chunk[i]);
     await async {};
-    s.expect(#ready(i + 1), 0);
+    s.expect(#ready, 0, i + 1);
   };
 
   for (item in sequence.vals()) {
-    let (index, response, status, pos) = item;
+    let (index, response, status, received, sent) = item;
     chunk[index].release(response);
     await result[index];
-    s.expect(status, pos);
+    s.expect(status, received, sent);
   };
   s.assert_();
 };
@@ -136,80 +135,83 @@ func test(sequence : [Item]) : async () {
 // single chunk starting from the #ready state
 do {
   let tests = [
-    (#ok, #ready 1, 1),
-    (#gap, #ready 0, 0),
-    (#reject, #ready 0, 0),
-    (#stop, #stopped, 0),
+    (#ok, #ready, 1, 1),
+    (#gap, #ready, 0, 0),
+    (#reject, #ready, 0, 0),
+    (#stop, #stopped, 0, 0),
   ];
   for (t in tests.vals()) {
-    let (response, status, pos) = t;
-    await test([(0, response, status, pos)]);
+    let (response, status, pos, sent) = t;
+    await test([(0, response, status, pos, sent)]);
   };
 };
 
 // single chunk starting from the #stopped state
 do {
   let tests = [
-    (#ok, #shutdown, 2),
-    (#gap, #stopped, 0),
-    (#reject, #stopped, 0),
-    (#stop, #shutdown, 1),
+    (#ok, #shutdown, 2, 0),
+    (#gap, #stopped, 0, 0),
+    (#reject, #stopped, 0, 0),
+    (#stop, #shutdown, 1, 0),
   ];
   for (t in tests.vals()) {
-    let (response, status, pos) = t;
+    let (response, status, pos, sent) = t;
     await test([
-      (0, #stop, #stopped, 0),
-      (1, response, status, pos),
+      (0, #stop, #stopped, 0, 0),
+      (1, response, status, pos, sent),
     ]);
   };
 };
 
 // two concurrent chunks respond in order
 await test([
-  (0, #ok, #ready 2, 1),
-  (1, #ok, #ready 2, 2),
+  (0, #ok, #ready, 1, 2),
+  (1, #ok, #ready, 2, 2),
 ]);
 
 await test([
-  (0, #stop, #stopped, 0),
-  (1, #ok, #shutdown, 2),
+  (0, #stop, #stopped, 0, 0),
+  (1, #ok, #shutdown, 2, 0),
 ]);
 
 await test([
-  (0, #gap, #paused, 0),
-  (1, #gap, #ready 0, 0),
+  (0, #gap, #paused, 0, 0),
+  (1, #gap, #ready, 0, 0),
 ]);
 
 await test([
-  (0, #reject, #paused, 0),
-  (1, #gap, #ready 0, 0),
+  (0, #reject, #paused, 0, 0),
+  (1, #gap, #ready, 0, 0),
 ]);
 
 // two concurrent chunks respond in reverse order
 do {
   let tests = [
-    ([#ok, #ok], [(#ready 2, 2), (#ready 2, 2)]),
-    ([#ok, #gap], [(#paused, 0), (#ready 1, 1)]),
-    ([#ok, #reject], [(#paused, 0), (#ready 1, 1)]),
-    ([#ok, #stop], [(#stopped, 1), (#stopped, 1)]),
-    ([#gap, #ok], [(#ready 2, 2), (#shutdown, 2)]),
-    ([#gap, #gap], [(#paused, 0), (#ready 0, 0)]),
-    ([#gap, #reject], [(#paused, 0), (#ready 0, 0)]),
-    ([#gap, #stop], [(#stopped, 1), (#shutdown, 1)]),
-    ([#reject, #ok], [(#ready 2, 2), (#shutdown, 2)]),
-    ([#reject, #gap], [(#paused, 0), (#ready 0, 0)]),
-    ([#reject, #reject], [(#paused, 0), (#ready 0, 0)]),
-    ([#reject, #stop], [(#stopped, 1), (#shutdown, 1)]),
-    ([#stop, #ok], [(#ready 2, 2), (#shutdown, 2)]),
-    ([#stop, #gap], [(#paused, 0), (#stopped, 0)]),
-    ([#stop, #reject], [(#paused, 0), (#stopped, 0)]),
-    ([#stop, #stop], [(#stopped, 1), (#shutdown, 1)]),
+    ([#ok, #ok], [(#ready, 2, 2), (#ready, 2, 2)]),
+    ([#ok, #gap], [(#paused, 0, 1), (#ready, 1, 1)]),
+    ([#ok, #reject], [(#paused, 0, 1), (#ready, 1, 1)]),
+    ([#ok, #stop], [(#stopped, 1, 1), (#stopped, 1, 1)]),
+
+    ([#gap, #ok], [(#ready, 2, 2), (#shutdown, 2, 0)]),
+    ([#gap, #gap], [(#paused, 0, 1), (#ready, 0, 0)]),
+    ([#gap, #reject], [(#paused, 0, 1), (#ready, 0, 0)]),
+    ([#gap, #stop], [(#stopped, 1, 1), (#shutdown, 1, 0)]),
+    
+    ([#reject, #ok], [(#ready, 2, 2), (#shutdown, 2, 0)]),
+    ([#reject, #gap], [(#paused, 0, 1), (#ready, 0, 0)]),
+    ([#reject, #reject], [(#paused, 0, 1), (#ready, 0, 0)]),
+    ([#reject, #stop], [(#stopped, 1, 1), (#shutdown, 1, 0)]),
+    
+    ([#stop, #ok], [(#ready, 2, 2), (#shutdown, 2, 0)]),
+    ([#stop, #gap], [(#paused, 0, 1), (#stopped, 0, 0)]),
+    ([#stop, #reject], [(#paused, 0, 1), (#stopped, 0, 0)]),
+    ([#stop, #stop], [(#stopped, 1, 1), (#shutdown, 1, 0)]),
   ];
   for (t in tests.vals()) {
     let (responses, statuses) = t;
     await test([
-      (1, responses[1], statuses[0].0, statuses[0].1),
-      (0, responses[0], statuses[1].0, statuses[1].1),
+      (1, responses[1], statuses[0].0, statuses[0].1, statuses[0].2),
+      (0, responses[0], statuses[1].0, statuses[1].1, statuses[1].2),
     ]);
   };
 };
@@ -224,17 +226,17 @@ do {
   for (i in Iter.range(0, N - 2)) {
     result[i] := s.send(chunk[i]);
     await async {};
-    s.expect(#ready(i + 1), 0);
+    s.expect(#ready, 0, i + 1);
   };
 
   result[N - 1] := s.send(chunk[N - 1]);
   await async {};
-  s.expect(#busy, 0);
+  s.expect(#busy, 0, N);
 
   for (i in Iter.range(0, N - 1)) {
     chunk[i].release(#ok);
     await result[i];
-    s.expect(#ready N, i + 1);
+    s.expect(#ready, i + 1, N);
   };
 
   s.assert_();

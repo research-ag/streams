@@ -1,14 +1,10 @@
 module {
-  public type ChunkMsg<T> = (
+  public type ChunkMessage<T> = (
     Nat,
     {
       #chunk : [T];
       #ping;
     },
   );
-  // public type ChunkMsg<T> = {
-  //   #chunk : (Nat, [T]);
-  //   #ping;
-  // };
-  public type ControlMsg = { #ok; #gap; #stop };
+  public type ControlMessage = { #ok; #gap; #stop };
 };

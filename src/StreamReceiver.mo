@@ -24,6 +24,9 @@ module {
   /// calling code should not catch the throw so that it gets passed through to
   /// the enclosing async expression of the calling code.
   public type Timeout = (Nat, () -> Int);
+  public type ControlMessage = Types.ControlMessage;
+  public type ChunkMessage<T> = Types.ChunkMessage<T>;
+
   public class StreamReceiver<T>(
     startPos : Nat,
     timeout : ?Timeout,
@@ -50,7 +53,7 @@ module {
     };
 
     /// processes a chunk and responds to sender
-    public func onChunk(cm : Types.ChunkMsg<T>) : Types.ControlMsg {
+    public func onChunk(cm : Types.ChunkMessage<T>) : Types.ControlMessage {
       let (start, msg) = cm;
       if (start != length_) return #gap;
       if (hasTimedOut()) return #stop;

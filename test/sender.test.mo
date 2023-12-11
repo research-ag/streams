@@ -16,7 +16,7 @@ do {
   let array = Array.tabulate<Text>(N, func(i) = "ab" # Char.toText(Char.fromNat32(Nat32.fromNat(i))));
 
   var i = 0;
-  func send(message : Types.ChunkMsg<?Text>) : async* Types.ControlMsg {
+  func send(message : Types.ChunkMessage<?Text>) : async* Types.ControlMessage {
     assert message == (i, #chunk([?array[i]]));
     #ok;
   };
@@ -36,7 +36,8 @@ do {
   };
 
   while (i < N) {
-    assert sender.status() == #ready i;
+    assert sender.status() == #ready;
+    assert sender.sent() == i;
     await* sender.sendChunk();
     i += 1;
   };
@@ -49,7 +50,7 @@ do {
 
   var i = 0;
 
-  func send(message : Types.ChunkMsg<?Text>) : async* Types.ControlMsg {
+  func send(message : Types.ChunkMessage<?Text>) : async* Types.ControlMessage {
     assert message == (2 * i, #chunk([?array[2 * i], ?array[2 * i + 1]]));
     #ok;
   };
@@ -69,7 +70,8 @@ do {
   };
 
   while (i < N / 2) {
-    assert sender.status() == #ready(2 * i);
+    assert sender.status() == #ready;
+    assert sender.sent() == 2 * i;
     await* sender.sendChunk();
     i += 1;
   };
@@ -77,7 +79,7 @@ do {
 
 // #stop response
 do {
-  func send(message : Types.ChunkMsg<?Text>) : async* Types.ControlMsg {
+  func send(message : Types.ChunkMessage<?Text>) : async* Types.ControlMessage {
     #stop;
   };
 
@@ -97,7 +99,7 @@ do {
 
 // #gap response
 do {
-  func send(message : Types.ChunkMsg<?Text>) : async* Types.ControlMsg {
+  func send(message : Types.ChunkMessage<?Text>) : async* Types.ControlMessage {
     #gap;
   };
 
@@ -111,8 +113,10 @@ do {
     },
   );
   Result.assertOk(sender.push("abc"));
-  assert sender.status() == #ready 0;
+  assert sender.status() == #ready;
+  assert sender.sent() == 0;
   await* sender.sendChunk();
-  assert sender.status() == #ready 0;
+  assert sender.status() == #ready;
+  assert sender.sent() == 0;
 };
 

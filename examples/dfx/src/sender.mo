@@ -6,7 +6,7 @@ import Result "mo:base/Result";
 
 actor class Sender(receiverId : Principal) {
   let receiver = actor (Principal.toText(receiverId)) : actor {
-    receive : (message : Types.ChunkMsg<?Text>) -> async Types.ControlMsg;
+    receive : (message : Types.ChunkMessage<?Text>) -> async Types.ControlMessage;
   };
 
   let MAX_LENGTH = 5;
@@ -26,7 +26,7 @@ actor class Sender(receiverId : Principal) {
     };
   };
 
-  func send(message : Types.ChunkMsg<?Text>) : async* Types.ControlMsg {
+  func send(message : Types.ChunkMessage<?Text>) : async* Types.ControlMessage {
     await receiver.receive(message);
   };
 

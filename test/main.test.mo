@@ -9,8 +9,8 @@ import Debug "mo:base/Debug";
 import Nat "mo:base/Nat";
 import Types "../src/types";
 
-type ChunkMsg = Types.ChunkMsg<?Text>;
-type ControlMsg = Types.ControlMsg;
+type ChunkMessage = Types.ChunkMessage<?Text>;
+type ControlMessage = Types.ControlMessage;
 type Sender<T,S> = StreamSender.StreamSender<T,S>;
 type Receiver<S> = StreamReceiver.StreamReceiver<S>;
 
@@ -46,7 +46,7 @@ func createSender(receiver : Receiver<?Text>) : Sender<Text, ?Text> {
     };
   };
 
-  func send(ch : ChunkMsg) : async* ControlMsg { receiver.onChunk(ch) };
+  func send(ch : ChunkMessage) : async* ControlMessage { receiver.onChunk(ch) };
 
   let sender = Sender<Text, ?Text>(
     counter,

@@ -16,7 +16,7 @@ actor class Receiver() {
     },
   );
 
-  public shared func receive(message : Types.ChunkMsg<?Text>) : async Types.ControlMsg {
+  public shared func receive(message : Types.ChunkMessage<?Text>) : async Types.ControlMessage {
     receiver.onChunk(message);
   };
 };

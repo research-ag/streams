@@ -30,13 +30,14 @@ module {
 
   // T = queue item type
   // S = stream item type
-  public type Status = { #shutdown; #stopped; #paused; #busy; #ready : Nat };
-
+  public type Status = { #shutdown; #stopped; #paused; #busy; #ready };
+  public type ControlMessage = Types.ControlMessage;
+  public type ChunkMessage<T> = Types.ChunkMessage<T>;
   public let MAX_CONCURRENT_CHUNKS_DEFAULT = 5;
 
   public class StreamSender<T, S>(
     counterCreator : () -> { accept(item : T) : ?S },
-    sendFunc : (x : Types.ChunkMsg<S>) -> async* Types.ControlMsg,
+    sendFunc : (x : Types.ChunkMessage<S>) -> async* Types.ControlMessage,
     settings : {
       maxQueueSize : ?Nat;
       maxConcurrentChunks : ?Nat;
@@ -106,7 +107,7 @@ module {
       if (isStopped()) return #stopped;
       if (isPaused()) return #paused;
       if (isBusy()) return #busy;
-      return #ready head;
+      return #ready;
     };
 
     /// Send chunk to the receiver
@@ -119,16 +120,16 @@ module {
     /// function throws immediately and does not attempt to send the chunk.
 
     public func sendChunk() : async* () {
-      let start = switch (status()) {
+      switch (status()) {
         case (#shutdown) throw Error.reject("Sender shut down");
         case (#stopped) throw Error.reject("Stream stopped by receiver");
         case (#paused) throw Error.reject("Stream is paused");
         case (#busy) throw Error.reject("Stream is busy");
-        case (#ready x) x;
+        case (#ready) {};
       };
-
+      let start = head;
       let elements = do {
-        var end = start;
+        var end = head;
         let counter = counterCreator();
         let vec = Vector.new<S>();
         label l loop {
@@ -154,7 +155,7 @@ module {
         };
       };
 
-      let chunkMsg = if (elements.size() == 0) {
+      let ChunkMessage = if (elements.size() == 0) {
         if (not shouldPing()) return;
         (start, #ping);
       } else {
@@ -191,7 +192,7 @@ module {
       };
 
       let res = try {
-        await* sendFunc(chunkMsg);
+        await* sendFunc(ChunkMessage);
       } catch (e) {
         // shutdown on permanent system errors
         switch (Error.code(e)) {
