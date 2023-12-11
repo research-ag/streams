@@ -3,20 +3,19 @@ import StreamSender "../../../src/StreamSender";
 import Types "../../../src/types";
 import Principal "mo:base/Principal";
 import Result "mo:base/Result";
+import Debug "mo:base/Debug";
 
 actor class Sender(receiverId : Principal) {
   let receiver = actor (Principal.toText(receiverId)) : actor {
     receive : (message : Types.ChunkMessage<?Text>) -> async Types.ControlMessage;
   };
 
-  let MAX_LENGTH = 5;
+  let MAX_LENGTH = 30;
 
   class counter() {
     var sum = 0;
-    // Any individual item larger than MAX_LENGTH is wrapped to null
-    // and its size is not counted.
     func wrap(item : Text) : (?Text, Nat) {
-      let s = item.size();
+      let s = (to_candid (item)).size();
       if (s <= MAX_LENGTH) (?item, s) else (null, 0);
     };
     public func accept(item : Text) : ??Text {

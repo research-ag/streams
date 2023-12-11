@@ -24,8 +24,14 @@ call ic.install_code(
 
 identity user;
 call sender_canister.add("abc");
+call receiver_canister.lastReceived();
 call sender_canister.add("def");
+call receiver_canister.lastReceived();
 call sender_canister.add("ghi");
+call receiver_canister.lastReceived();
 call sender_canister.add("jkl");
+call receiver_canister.lastReceived();
 call sender_canister.add("mno");
+call receiver_canister.lastReceived();
 call sender_canister.add("pqr");
+call receiver_canister.lastReceived();

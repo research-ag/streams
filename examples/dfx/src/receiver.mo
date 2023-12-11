@@ -12,11 +12,16 @@ actor class Receiver() {
     func(index : Nat, item : ?Text) {
       assert received.size() == index;
       received.add(item);
-      Debug.print(debug_show item);
     },
   );
 
   public shared func receive(message : Types.ChunkMessage<?Text>) : async Types.ControlMessage {
     receiver.onChunk(message);
+  };
+
+  public query func lastReceived() : async ??Text {
+    if (received.size() == 0) { null } else {
+      ?received.get(received.size() - 1);
+    };
   };
 };

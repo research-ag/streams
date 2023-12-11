@@ -103,4 +103,3 @@ do {
   assert sender.status() == #ready;
   assert sender.sent() == 0;
 };
-
