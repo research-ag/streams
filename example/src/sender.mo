@@ -1,13 +1,14 @@
-import StreamReceiver "../../../src/StreamReceiver";
-import StreamSender "../../../src/StreamSender";
-import Types "../../../src/types";
+import Stream "../../src/StreamSender";
 import Principal "mo:base/Principal";
 import Result "mo:base/Result";
 import Debug "mo:base/Debug";
 
 actor class Sender(receiverId : Principal) {
+  type ControlMessage = Stream.ControlMessage;
+  type ChunkMessage = Stream.ChunkMessage<?Text>;
+
   let receiver = actor (Principal.toText(receiverId)) : actor {
-    receive : (message : Types.ChunkMessage<?Text>) -> async Types.ControlMessage;
+    receive : (message : ChunkMessage) -> async ControlMessage;
   };
 
   let MAX_LENGTH = 30;
@@ -25,11 +26,11 @@ actor class Sender(receiverId : Principal) {
     };
   };
 
-  func send(message : Types.ChunkMessage<?Text>) : async* Types.ControlMessage {
+  func send(message : ChunkMessage) : async* ControlMessage {
     await receiver.receive(message);
   };
 
-  let sender = StreamSender.StreamSender<Text, ?Text>(
+  let sender = Stream.StreamSender<Text, ?Text>(
     counter,
     send,
     null
