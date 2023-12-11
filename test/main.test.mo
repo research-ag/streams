@@ -7,10 +7,11 @@ import Error "mo:base/Error";
 import Time "mo:base/Time";
 import Debug "mo:base/Debug";
 import Nat "mo:base/Nat";
+import Types "../src/types";
 
-type ChunkMsg = StreamSender.ChunkMsg<?Text>;
-type ControlMsg = StreamSender.ControlMsg;
-type Sender<T,S> = StreamSender.StreamSender<T,S>;
+type ChunkMessage = Types.ChunkMessage<?Text>;
+type ControlMessage = Types.ControlMessage;
+type Sender<T, S> = StreamSender.StreamSender<T, S>;
 type Receiver<S> = StreamReceiver.StreamReceiver<S>;
 
 func createReceiver() : Receiver<?Text> {
@@ -18,7 +19,7 @@ func createReceiver() : Receiver<?Text> {
 
   let receiver = Receiver<?Text>(
     0,
-    ?(10 ** 9, Time.now),
+    ?(10 ** 9),
     func(pos : Nat, item : ?Text) {
       assert pos == received.size();
       received.add(item);
@@ -45,7 +46,7 @@ func createSender(receiver : Receiver<?Text>) : Sender<Text, ?Text> {
     };
   };
 
-  func send(ch : ChunkMsg) : async* ControlMsg { receiver.onChunk(ch) };
+  func send(ch : ChunkMessage) : async* ControlMessage { receiver.onChunk(ch) };
 
   let sender = Sender<Text, ?Text>(
     counter,
@@ -77,8 +78,8 @@ let n = sender.length();
 var i = 0;
 let max = 100;
 while (sender.received() < n and i < max) {
-  ignore await* sender.sendChunk();
+  await* sender.sendChunk();
   i += 1;
-}; 
+};
 Debug.print("sent " # Nat.toText(i) # " chunks");
 assert i != max;

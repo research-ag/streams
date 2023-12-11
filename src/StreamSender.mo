@@ -27,22 +27,23 @@ module {
   /// await* sender.sendChunk(); // will send (123, [1..10], 0) to `anotherCanister`
   /// await* sender.sendChunk(); // will send (123, [11..12], 10) to `anotherCanister`
   /// await* sender.sendChunk(); // will do nothing, stream clean
-  public type ChunkMsg<T> = Types.ChunkMsg<T>;
-  public type ControlMsg = Types.ControlMsg;
 
   // T = queue item type
   // S = stream item type
+  public type Status = { #shutdown; #stopped; #paused; #busy; #ready };
+  public type ControlMessage = Types.ControlMessage;
+  public type ChunkMessage<T> = Types.ChunkMessage<T>;
+  public let MAX_CONCURRENT_CHUNKS_DEFAULT = 5;
+
   public class StreamSender<T, S>(
     counterCreator : () -> { accept(item : T) : ?S },
-    sendFunc : (x : ChunkMsg<S>) -> async* ControlMsg,
+    sendFunc : (x : Types.ChunkMessage<S>) -> async* Types.ControlMessage,
     settings : {
       maxQueueSize : ?Nat;
       maxConcurrentChunks : ?Nat;
       keepAliveSeconds : ?Nat;
     },
   ) {
-    let MAX_CONCURRENT_CHUNKS_DEFAULT = 5;
-
     let buffer = SWB.SlidingWindowBuffer<T>();
 
     let settings_ = {
@@ -101,13 +102,12 @@ module {
     /// #ready n means that the stream sender is ready to send a chunk starting
     /// from position n.
 
-    public type Status = { #shutdown; #stopped; #paused; #busy; #ready : Nat };
     public func status() : Status {
       if (isShutdown()) return #shutdown;
       if (isStopped()) return #stopped;
       if (isPaused()) return #paused;
       if (isBusy()) return #busy;
-      return #ready head;
+      return #ready;
     };
 
     /// Send chunk to the receiver
@@ -120,16 +120,16 @@ module {
     /// function throws immediately and does not attempt to send the chunk.
 
     public func sendChunk() : async* () {
-      let start = switch (status()) {
+      switch (status()) {
         case (#shutdown) throw Error.reject("Sender shut down");
         case (#stopped) throw Error.reject("Stream stopped by receiver");
         case (#paused) throw Error.reject("Stream is paused");
         case (#busy) throw Error.reject("Stream is busy");
-        case (#ready x) x;
+        case (#ready) {};
       };
-
+      let start = head;
       let elements = do {
-        var end = start;
+        var end = head;
         let counter = counterCreator();
         let vec = Vector.new<S>();
         label l loop {
@@ -155,7 +155,7 @@ module {
         };
       };
 
-      let chunkMsg = if (elements.size() == 0) {
+      let ChunkMessage = if (elements.size() == 0) {
         if (not shouldPing()) return;
         (start, #ping);
       } else {
@@ -186,13 +186,13 @@ module {
         // state
         switch (res) {
           case (#ok) if (stopped) assert_(end <= buffer.start());
-          case (#gap or #error) if (not paused) assert (end <= head);
+          case (#gap or #error) if (not (paused or stopped)) assert_(end <= head);
           case (_) {};
         };
       };
 
       let res = try {
-        await* sendFunc(chunkMsg);
+        await* sendFunc(ChunkMessage);
       } catch (e) {
         // shutdown on permanent system errors
         switch (Error.code(e)) {
@@ -201,6 +201,11 @@ module {
           // TODO: revisit #canister_reject after an IC protocol bug is fixed.
           // Currently, a stopped receiver responds with #canister_reject.
           // In the future it should be #canister_error.
+          //
+          // However, there is an advantage of handling #canister_reject and
+          // #canister_error equally. It becomes easier to test because in the
+          // moc interpreter we can simulate #canister_reject but not
+          // #canister_error.
         };
         #error;
       };

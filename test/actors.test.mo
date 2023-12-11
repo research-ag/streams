@@ -5,10 +5,11 @@ import Error "mo:base/Error";
 import Option "mo:base/Option";
 import Debug "mo:base/Debug";
 import Nat "mo:base/Nat";
+import Types "../src/types";
 
 // types for receiver actor
-type ChunkMsg = StreamReceiver.ChunkMsg<?Text>;
-type ControlMsg = StreamReceiver.ControlMsg;
+type ChunkMessage = Types.ChunkMessage<?Text>;
+type ControlMessage = Types.ControlMessage;
 
 // receiver actor
 actor B {
@@ -34,7 +35,7 @@ actor B {
 
   // required top-level boilerplate code,
   // a pass-through to StreamReceiver
-  public func receive(m : ChunkMsg) : async ControlMsg {
+  public func receive(m : ChunkMessage) : async ControlMessage {
     let start = m.0;
     var end = m.0;
     var str = ".   B recv: (" # Nat.toText(m.0) # ", ";
@@ -116,7 +117,7 @@ actor A {
   // We can place additional code here, for example, for logging.
   // However, we must not catch and convert any Errors. The Errors from
   // `await r` must be passed through unaltered or the StreamSender may break.
-  func sendToReceiver(m : ChunkMsg) : async* ControlMsg {
+  func sendToReceiver(m : ChunkMessage) : async* ControlMessage {
     let start = m.0;
     var end = m.0;
     var str = "A send: (" # Nat.toText(m.0) # ", ";
@@ -183,7 +184,7 @@ actor A {
   public query func isState(l : [Nat]) : async Bool {
     Debug.print("A isState: " # debug_show(l));
     sender.length() == l[0] and
-    sender.sent() == ?l[1] and
+    sender.sent() == l[1] and
     sender.received() == l[2] and
     sender.busyLevel() == l[3];
   };
