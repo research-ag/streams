@@ -1,7 +1,7 @@
 import StreamReceiver "../../../src/StreamReceiver";
 import Buffer "mo:base/Buffer";
 import Debug "mo:base/Debug";
-import Types "../../../src/Types";
+import Types "../../../src/types";
 
 actor class Receiver() {
   let received = Buffer.Buffer<?Text>(0);

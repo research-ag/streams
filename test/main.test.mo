@@ -11,7 +11,7 @@ import Types "../src/types";
 
 type ChunkMessage = Types.ChunkMessage<?Text>;
 type ControlMessage = Types.ControlMessage;
-type Sender<T,S> = StreamSender.StreamSender<T,S>;
+type Sender<T, S> = StreamSender.StreamSender<T, S>;
 type Receiver<S> = StreamReceiver.StreamReceiver<S>;
 
 func createReceiver() : Receiver<?Text> {
@@ -19,7 +19,7 @@ func createReceiver() : Receiver<?Text> {
 
   let receiver = Receiver<?Text>(
     0,
-    ?(10 ** 9, Time.now),
+    ?(10 ** 9),
     func(pos : Nat, item : ?Text) {
       assert pos == received.size();
       received.add(item);
@@ -80,6 +80,6 @@ let max = 100;
 while (sender.received() < n and i < max) {
   await* sender.sendChunk();
   i += 1;
-}; 
+};
 Debug.print("sent " # Nat.toText(i) # " chunks");
 assert i != max;

@@ -2,6 +2,7 @@ import Debug "mo:base/Debug";
 import Error "mo:base/Error";
 import R "mo:base/Result";
 import Array "mo:base/Array";
+import Time "mo:base/Time";
 import SWB "mo:swb";
 import Types "types";
 
@@ -23,13 +24,12 @@ module {
   /// The function `onChunk` throws in case of a gap (= broken pipe). The
   /// calling code should not catch the throw so that it gets passed through to
   /// the enclosing async expression of the calling code.
-  public type Timeout = (Nat, () -> Int);
   public type ControlMessage = Types.ControlMessage;
   public type ChunkMessage<T> = Types.ChunkMessage<T>;
 
   public class StreamReceiver<T>(
     startPos : Nat,
-    timeout : ?Timeout,
+    timeout : ?Nat,
     itemCallback : (pos : Nat, item : T) -> (),
     // itemCallback is custom made per-stream and contains the streamId
   ) {
@@ -39,7 +39,7 @@ module {
     public func length() : Nat = length_;
 
     var lastChunkReceived_ : Int = switch (timeout) {
-      case (?to) to.1 ();
+      case (?to) Time.now();
       case (_) 0;
     };
 
@@ -48,7 +48,7 @@ module {
 
     /// returns flag if receiver timed out because of non-activity
     public func hasTimedOut() : Bool = switch (timeout) {
-      case (?to)(to.1 () - lastChunkReceived_) > to.0;
+      case (?to)(Time.now() - lastChunkReceived_) > to;
       case (null) false;
     };
 
@@ -67,7 +67,7 @@ module {
         case (#ping) {};
       };
       switch (timeout) {
-        case (?to) lastChunkReceived_ := to.1 ();
+        case (?to) lastChunkReceived_ := Time.now();
         case (_) {};
       };
       return #ok;
