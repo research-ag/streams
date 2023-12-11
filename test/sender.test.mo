@@ -24,11 +24,7 @@ do {
   let sender = StreamSender.StreamSender<Text, ?Text>(
     Base.create(5),
     send,
-    {
-      maxQueueSize = null;
-      maxConcurrentChunks = null;
-      keepAliveSeconds = null;
-    },
+    null
   );
 
   for (i in Iter.range(0, N - 1)) {
@@ -58,11 +54,7 @@ do {
   let sender = StreamSender.StreamSender<Text, ?Text>(
     Base.create(6),
     send,
-    {
-      maxQueueSize = null;
-      maxConcurrentChunks = null;
-      keepAliveSeconds = null;
-    },
+    null,
   );
 
   for (i in Iter.range(0, N - 1)) {
@@ -86,11 +78,7 @@ do {
   let sender = StreamSender.StreamSender<Text, ?Text>(
     Base.create(5),
     send,
-    {
-      maxQueueSize = null;
-      maxConcurrentChunks = null;
-      keepAliveSeconds = null;
-    },
+    null,
   );
   Result.assertOk(sender.push("abc"));
   await* sender.sendChunk();
@@ -106,11 +94,7 @@ do {
   let sender = StreamSender.StreamSender<Text, ?Text>(
     Base.create(5),
     send,
-    {
-      maxQueueSize = null;
-      maxConcurrentChunks = null;
-      keepAliveSeconds = null;
-    },
+    null,
   );
   Result.assertOk(sender.push("abc"));
   assert sender.status() == #ready;

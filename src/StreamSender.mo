@@ -34,22 +34,23 @@ module {
   public type ControlMessage = Types.ControlMessage;
   public type ChunkMessage<T> = Types.ChunkMessage<T>;
   public let MAX_CONCURRENT_CHUNKS_DEFAULT = 5;
+  public type Settings = {
+      maxQueueSize : ?Nat;
+      maxConcurrentChunks : ?Nat;
+      keepAliveSeconds : ?Nat;
+    };
 
   public class StreamSender<T, S>(
     counterCreator : () -> { accept(item : T) : ?S },
     sendFunc : (x : Types.ChunkMessage<S>) -> async* Types.ControlMessage,
-    settings : {
-      maxQueueSize : ?Nat;
-      maxConcurrentChunks : ?Nat;
-      keepAliveSeconds : ?Nat;
-    },
+    settings : ?Settings,
   ) {
     let buffer = SWB.SlidingWindowBuffer<T>();
 
     let settings_ = {
-      var maxQueueSize = settings.maxQueueSize;
-      var maxConcurrentChunks = settings.maxConcurrentChunks;
-      var keepAliveSeconds = settings.keepAliveSeconds;
+      var maxQueueSize = Option.flatten(Option.map(settings, func(s : Settings) : ?Nat = s.maxQueueSize));
+      var maxConcurrentChunks = Option.flatten(Option.map(settings, func(s : Settings) : ?Nat = s.maxConcurrentChunks));
+      var keepAliveSeconds = Option.flatten(Option.map(settings, func(s : Settings) : ?Nat = s.keepAliveSeconds));
     };
 
     var stopped = false;

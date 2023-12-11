@@ -51,11 +51,7 @@ func createSender(receiver : Receiver<?Text>) : Sender<Text, ?Text> {
   let sender = Sender<Text, ?Text>(
     counter,
     send,
-    {
-      maxQueueSize = null;
-      maxConcurrentChunks = null;
-      keepAliveSeconds = null;
-    },
+    null,
   );
   sender;
 };

@@ -33,11 +33,7 @@ actor class Sender(receiverId : Principal) {
   let sender = StreamSender.StreamSender<Text, ?Text>(
     counter,
     send,
-    {
-      maxQueueSize = null;
-      maxConcurrentChunks = null;
-      keepAliveSeconds = null;
-    },
+    null
   );
 
   public shared func add(text : Text) : async () {

@@ -42,11 +42,7 @@ class Sender(n : Nat) {
   let sender = StreamSender.StreamSender<Text, ?Text>(
     Base.create(1),
     sendChunkMessage,
-    {
-      maxQueueSize = null;
-      maxConcurrentChunks = null;
-      keepAliveSeconds = null;
-    },
+    null,
   );
 
   public func send(chunk : Chunk) : async () {

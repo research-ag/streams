@@ -154,11 +154,7 @@ actor A {
   let sender = StreamSender.StreamSender<Text, ?Text>(
     counter,
     sendToReceiver,
-    {
-      maxQueueSize = null;
-      maxConcurrentChunks = null;
-      keepAliveSeconds = null;
-    },
+    null,
   );
 
   public func submit(item : Text) : async { #err : { #NoSpace }; #ok : Nat } {
