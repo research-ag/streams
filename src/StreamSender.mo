@@ -156,7 +156,7 @@ module {
         };
       };
 
-      let ChunkMessage = if (elements.size() == 0) {
+      let chunkMessage = if (elements.size() == 0) {
         if (not shouldPing()) return;
         (start, #ping);
       } else {
@@ -193,7 +193,7 @@ module {
       };
 
       let res = try {
-        await* sendFunc(ChunkMessage);
+        await* sendFunc(chunkMessage);
       } catch (e) {
         // shutdown on permanent system errors
         switch (Error.code(e)) {
