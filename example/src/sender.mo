@@ -1,6 +1,6 @@
-import StreamReceiver "../../../src/StreamReceiver";
-import StreamSender "../../../src/StreamSender";
-import Types "../../../src/types";
+import StreamReceiver "../../src/StreamReceiver";
+import StreamSender "../../src/StreamSender";
+import Types "../../src/types";
 import Principal "mo:base/Principal";
 import Result "mo:base/Result";
 import Debug "mo:base/Debug";

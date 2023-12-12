@@ -35,10 +35,25 @@ module {
   public type ChunkMessage<T> = Types.ChunkMessage<T>;
   public let MAX_CONCURRENT_CHUNKS_DEFAULT = 5;
   public type Settings = {
-      maxQueueSize : ?Nat;
-      maxConcurrentChunks : ?Nat;
-      keepAliveSeconds : ?Nat;
+    maxQueueSize : ?Nat;
+    maxConcurrentChunks : ?Nat;
+    keepAliveSeconds : ?Nat;
+  };
+
+  public type StableData<T> = {
+    buffer : SWB.StableData<T>;
+    settings_ : {
+      var maxQueueSize : ?Nat;
+      var maxConcurrentChunks : ?Nat;
+      var keepAliveSeconds : ?Nat;
     };
+    stopped : Bool;
+    paused : Bool;
+    head : Nat;
+    lastChunkSent : Int;
+    concurrentChunks : Nat;
+    shutdown : Bool;
+  };
 
   public class StreamSender<T, S>(
     counterCreator : () -> { accept(item : T) : ?S },
@@ -47,7 +62,7 @@ module {
   ) {
     let buffer = SWB.SlidingWindowBuffer<T>();
 
-    let settings_ = {
+    var settings_ = {
       var maxQueueSize = Option.flatten(Option.map(settings, func(s : Settings) : ?Nat = s.maxQueueSize));
       var maxConcurrentChunks = Option.flatten(Option.map(settings, func(s : Settings) : ?Nat = s.maxConcurrentChunks));
       var keepAliveSeconds = Option.flatten(Option.map(settings, func(s : Settings) : ?Nat = s.keepAliveSeconds));
@@ -60,13 +75,26 @@ module {
     var concurrentChunks = 0;
     var shutdown = false;
 
-    func isQueueFull() : Bool = switch (settings_.maxQueueSize) {
-      case (?max) buffer.len() >= max;
-      case (null) false;
+    public func share() : StableData<T> = {
+      buffer = buffer.share();
+      settings_ = settings_;
+      stopped = stopped;
+      paused = paused;
+      head = head;
+      lastChunkSent = lastChunkSent;
+      concurrentChunks = concurrentChunks;
+      shutdown = shutdown;
     };
 
-    func assert_(condition : Bool) {
-      if (not condition) shutdown := true;
+    public func unshare(data : StableData<T>) {
+      buffer.unshare(data.buffer);
+      settings_ := data.settings_;
+      stopped := data.stopped;
+      paused := data.paused;
+      head := data.head;
+      lastChunkSent := data.lastChunkSent;
+      concurrentChunks := data.concurrentChunks;
+      shutdown := data.shutdown;
     };
 
     /// add item to the stream
@@ -74,9 +102,14 @@ module {
       #ok : Nat;
       #err : { #NoSpace };
     } {
-      if (isQueueFull())
-      #err(#NoSpace) else
-      #ok(buffer.add(item));
+      func isQueueFull() : Bool = switch (settings_.maxQueueSize) {
+        case (?max) buffer.len() >= max;
+        case (null) false;
+      };
+
+      if (isQueueFull()) { #err(#NoSpace) } else {
+        #ok(buffer.add(item));
+      };
     };
 
     /// Get the stream sender's status for inspection.
@@ -149,6 +182,8 @@ module {
         Vector.toArray(vec);
       };
 
+      let end = start + elements.size();
+
       func shouldPing() : Bool {
         switch (settings_.keepAliveSeconds) {
           case (?i) lastChunkSent + i * 1_000_000_000 < Time.now();
@@ -165,32 +200,6 @@ module {
 
       lastChunkSent := Time.now();
       concurrentChunks += 1;
-
-      let end = start + elements.size();
-      func receive() {
-        concurrentChunks -= 1;
-        if (concurrentChunks == 0) paused := false;
-      };
-
-      func assertions(res : { #ok; #gap; #stop; #error }) {
-        // start
-        switch (res) {
-          case (#gap or #stop or #error) assert_(buffer.start() <= start);
-          case (_) {};
-        };
-        // head
-        switch (res) {
-          case (#ok or #stop) assert_(end <= head);
-          case (#gap) if (start < head) assert_(end <= head);
-          case (_) {};
-        };
-        // state
-        switch (res) {
-          case (#ok) if (stopped) assert_(end <= buffer.start());
-          case (#gap or #error) if (not (paused or stopped)) assert_(end <= head);
-          case (_) {};
-        };
-      };
 
       let res = try {
         await* sendFunc(chunkMessage);
@@ -211,7 +220,27 @@ module {
         #error;
       };
 
-      assertions(res);
+      func assert_(condition : Bool) {
+        if (not condition) shutdown := true;
+      };
+
+      // assertions start
+      switch (res) {
+        case (#gap or #stop or #error) assert_(buffer.start() <= start);
+        case (_) {};
+      };
+      // assertions head
+      switch (res) {
+        case (#ok or #stop) assert_(end <= head);
+        case (#gap) if (start < head) assert_(end <= head);
+        case (_) {};
+      };
+      // assertions state
+      switch (res) {
+        case (#ok) if (stopped) assert_(end <= buffer.start());
+        case (#gap or #error) if (not (paused or stopped)) assert_(end <= head);
+        case (_) {};
+      };
 
       // advance the start pointer
       switch (res) {
@@ -232,7 +261,11 @@ module {
         case (#gap or #error) paused := true;
         case (_) {};
       };
-      receive();
+
+      concurrentChunks -= 1;
+      if (concurrentChunks == 0) {
+        paused := false;
+      };
     };
 
     /// total amount of items, ever added to the stream sender, also an index, which will be assigned to the next item
