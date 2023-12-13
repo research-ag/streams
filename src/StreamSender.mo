@@ -268,6 +268,15 @@ module {
       };
     };
 
+    public func restart() : Bool {
+      if (concurrentChunks == 0) {
+        stopped := false;
+        shutdown := false;
+        paused := false;
+      };
+      status() == #ready;
+    };
+
     /// total amount of items, ever added to the stream sender, also an index, which will be assigned to the next item
     public func length() : Nat = buffer.end();
 
