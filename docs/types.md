@@ -2,7 +2,7 @@
 
 ## Type `ChunkMessage`
 ``` motoko no-repl
-type ChunkMessage<T> = (Nat, {#chunk : [T]; #ping})
+type ChunkMessage<T> = (length : Nat, {#chunk : [T]; #ping})
 ```
 
 Argument of processing function.

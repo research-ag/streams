@@ -5,35 +5,21 @@
 type ControlMessage = Types.ControlMessage
 ```
 
-Usage:
-
-let receiver = StreamReceiver<Int>(
-  123
-  func (streamId : Nat, element: Int, index: Nat): () {
-    ... do your logic with incoming item
-  }
-);
-
-Hook-up receive function in the actor class:
-public shared func onStreamChunk(streamId : Nat, chunk: [Int], firstIndex: Nat) : async () {
-  switch (streamId) case (123) { await receiver.onChunk(chunk, firstIndex); }; case (_) { Error.reject("Unknown stream"); }; };
-};
-
-The function `onChunk` throws in case of a gap (= broken pipe). The
-calling code should not catch the throw so that it gets passed through to
-the enclosing async expression of the calling code.
+Return type of processing function.
 
 ## Type `ChunkMessage`
 ``` motoko no-repl
 type ChunkMessage<T> = Types.ChunkMessage<T>
 ```
 
+Argument of processing function.
 
 ## Type `StableData`
 ``` motoko no-repl
 type StableData = (Nat, Int)
 ```
 
+Type of `StableData` for `share`/`unshare` function.
 
 ## Class `StreamReceiver<T>`
 
@@ -41,12 +27,21 @@ type StableData = (Nat, Int)
 class StreamReceiver<T>(startPos : Nat, timeout : ?Nat, itemCallback : (pos : Nat, item : T) -> ())
 ```
 
+Stream recevier receiving chunks on `onChunk` call,
+validating whether `length` in chunk message corresponds to `length` inside `StreamRecevier`,
+calling `itemCallback` on each items of the chunk.
+
+Arguments:
+* `startPos` is starting length.
+* `timeout` is maximum time between onChunk calls. Default time period is infinite.
+* `itemCallback` function to be called on each received item.
 
 ### Function `share`
 ``` motoko no-repl
 func share() : StableData
 ```
 
+Share data in order to store in stable varible. No validation is performed.
 
 
 ### Function `unshare`
@@ -54,6 +49,7 @@ func share() : StableData
 func unshare(data : StableData)
 ```
 
+Unhare data in order to store in stable varible. No validation is performed.
 
 
 ### Function `onChunk`
@@ -61,7 +57,9 @@ func unshare(data : StableData)
 func onChunk(cm : Types.ChunkMessage<T>) : Types.ControlMessage
 ```
 
-processes a chunk and responds to sender
+Returns `#gap` if length in chunk don't correspond to length in `StreamReceiver`.
+Returns `#stopped` if the receiver is already stopped or maximum time out between chunks exceeded.
+Otherwise processes a chunk and call `itemCallback` on each item.
 
 
 ### Function `stop`
@@ -69,6 +67,7 @@ processes a chunk and responds to sender
 func stop()
 ```
 
+Manually stop the receiver.
 
 
 ### Function `length`
@@ -76,6 +75,7 @@ func stop()
 func length() : Nat
 ```
 
+Current number of received items.
 
 
 ### Function `lastChunkReceived`
@@ -83,7 +83,7 @@ func length() : Nat
 func lastChunkReceived() : Int
 ```
 
-returns timestamp when stream received last chunk
+Returns timestamp when stream received last chunk
 
 
 ### Function `stopped`
@@ -91,4 +91,4 @@ returns timestamp when stream received last chunk
 func stopped() : Bool
 ```
 
-returns flag if receiver timed out because of non-activity
+Returns flag if receiver timed out because of non-activity or stopped.

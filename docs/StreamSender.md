@@ -50,6 +50,7 @@ class StreamSender<T, S>(counterCreator : () -> { accept : (item : T) -> ?S }, s
 
 Stream sender receiving items of type `T` with `push` function and sending them with `sendFunc` callback when calling `sendChunk`.
 
+Arguments:
 * `sendFunc` typically should implement sending chunk to the receiver canister.
 * `counterCreator` is used to create a chunk out of pushed items.
 `accept` function is called sequentially on items which are added to the chunk, until receiving `null`.
