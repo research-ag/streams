@@ -269,10 +269,8 @@ module {
     };
 
     public func restart() : Bool {
-      if (concurrentChunks == 0) {
+      if (not (paused or shutdown)) {
         stopped := false;
-        shutdown := false;
-        paused := false;
       };
       status() == #ready;
     };
