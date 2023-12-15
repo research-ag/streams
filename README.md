@@ -64,8 +64,8 @@ The benchmarking code can be found here: [canister-profiling](https://github.com
 MR Research AG, 2023
 ## Authors
 
-Main author:\
-Contributors:
+Main author: Timo Hanke (timohanke).
+Contributors: Timo Hanke (timohanke), Andrii Stepanov (AStepanov25).
 ## License 
 
 Apache-2.0
