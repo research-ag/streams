@@ -1,4 +1,4 @@
-import Stream "mo:streams/StreamReceiver";
+import Stream "../../../src/StreamReceiver";
 import Buffer "mo:base/Buffer";
 import Debug "mo:base/Debug";
 
