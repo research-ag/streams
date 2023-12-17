@@ -271,10 +271,9 @@ module {
 
     /// Restart the sender in case it's stopped after receiving `#stop` from `sendFunc`.
     public func restart() : Bool {
-      if (not (paused or shutdown)) {
-        stopped := false;
-      };
-      status() == #ready;
+      if (shutdown) return false;
+      stopped := false;
+      return true;
     };
 
     /// Total amount of items, ever added to the stream sender, also an index, which will be assigned to the next item
