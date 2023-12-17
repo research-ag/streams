@@ -239,7 +239,7 @@ module {
       // assertions state
       switch (res) {
         case (#ok) if (stopped) assert_(end <= buffer.start());
-        case (#gap or #error) if (not (paused or stopped)) assert_(end <= head);
+        case (#gap or #error) if (not paused) assert_(end <= head);
         case (_) {};
       };
 
@@ -250,23 +250,23 @@ module {
         case (_) {};
       };
 
-      // retreat the head pointer
+      // retrace the head pointer and pause
       switch (res) {
-        case (#gap or #stop or #error) head := Nat.min(head, start);
+        case (#gap or #stop or #error) {
+          head := Nat.min(head, start);
+          paused := true;
+        };
         case (_) {};
       };
 
-      // transition state
-      switch (res) {
-        case (#stop) stopped := true;
-        case (#gap or #error) paused := true;
-        case (_) {};
-      };
-
+      // unpause stream
       concurrentChunks -= 1;
       if (concurrentChunks == 0) {
         paused := false;
       };
+
+      // stop stream
+      if (res == #stop) stopped := true;
     };
 
     /// Restart the sender in case it's stopped after receiving `#stop` from `sendFunc`.
