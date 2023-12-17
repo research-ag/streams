@@ -7,15 +7,15 @@ actor class Main(receiver : Principal) {
 
   // begin boilerplate
   type RecvFunc = shared Stream.ChunkMessage<Item> -> async Stream.ControlMessage;
-  type ReceiverAPI = actor { receive : RecvFunc }; // substitute your receiver endpoint name
-  let A : ReceiverAPI = actor (Principal.toText(receiver)); // use your receiver argument here
+  type ReceiverAPI = actor { receive : RecvFunc }; // substitute your receiver's endpoint for `receive`
+  let A : ReceiverAPI = actor (Principal.toText(receiver)); // use the init argument `receiver` here
   let send_ = func(x : Stream.ChunkMessage<Item>) : async* Stream.ControlMessage {
-    await A.receive(x) // ok to wrap custom code around this but not tamper with response
+    await A.receive(x) // ok to wrap custom code around this but not tamper with response or trap
   };
   // end boilerplate
 
   // define your sender by defining counter
-  class counter() {
+  class counter_() {
     var sum = 0;
     let maxLength = 3;
     public func accept(item : Item) : ?Item {
@@ -24,7 +24,7 @@ actor class Main(receiver : Principal) {
       return ?item;
     };
   };
-  let sender = Stream.StreamSender<Item, Item>(counter, send_, null);
+  let sender = Stream.StreamSender<Item, Item>(counter_, send_, null);
 
   // example use of sender `push` and `sendChunk`
   public shared func enqueue(n : Nat) : async () {
