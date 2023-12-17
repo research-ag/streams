@@ -1,4 +1,4 @@
-import Stream "mo:streams/StreamSender";
+import Stream "../../../src/StreamSender";
 import Principal "mo:base/Principal";
 
 actor class Main(receiver : Principal) {

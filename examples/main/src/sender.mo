@@ -1,4 +1,4 @@
-import Stream "mo:streams/StreamSender";
+import Stream "../../../src/StreamSender";
 import Principal "mo:base/Principal";
 import Result "mo:base/Result";
 import Debug "mo:base/Debug";

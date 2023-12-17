@@ -1,4 +1,4 @@
-import Stream "mo:streams/StreamReceiver";
+import Stream "../../../src/StreamReceiver";
 import Error "mo:base/Error";
 
 actor class Main(sender : Principal) {
