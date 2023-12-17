@@ -1,12 +1,14 @@
-import StreamReceiver "../../src/StreamReceiver";
+import Stream "../../../src/StreamReceiver";
 import Buffer "mo:base/Buffer";
 import Debug "mo:base/Debug";
-import Types "../../src/types";
 
-actor class Receiver() {
+actor Receiver {
+  type ControlMessage = Stream.ControlMessage;
+  type ChunkMessage = Stream.ChunkMessage<?Text>;
+
   let received = Buffer.Buffer<?Text>(0);
 
-  let receiver = StreamReceiver.StreamReceiver<?Text>(
+  let receiver = Stream.StreamReceiver<?Text>(
     0,
     null,
     func(index : Nat, item : ?Text) {
@@ -15,7 +17,7 @@ actor class Receiver() {
     },
   );
 
-  public shared func receive(message : Types.ChunkMessage<?Text>) : async Types.ControlMessage {
+  public shared func receive(message : ChunkMessage) : async ControlMessage {
     receiver.onChunk(message);
   };
 
