@@ -54,8 +54,16 @@ module {
     public func onChunk(cm : Types.ChunkMessage<T>) : Types.ControlMessage {
       let (start, msg) = cm;
       if (start != length_) return #gap;
-      updateTimeout();
-      if (stopped_) return #stop;
+      switch (msg) {
+        case (#restart) {
+          lastChunkReceived_ := Time.now();
+          stopped_ := false;
+        };
+        case (#ping or #chunk _) {
+          updateTimeout();
+          if (stopped_) return #stop;
+        };
+      };
       switch (msg) {
         case (#chunk ch) {
           for (i in ch.keys()) {
@@ -63,7 +71,7 @@ module {
             length_ += 1;
           };
         };
-        case (#ping) {};
+        case (#ping or #restart) {};
       };
       return #ok;
     };
