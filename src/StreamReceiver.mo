@@ -14,7 +14,7 @@ module {
   public type ChunkMessage<T> = Types.ChunkMessage<T>;
 
   /// Type of `StableData` for `share`/`unshare` function.
-  public type StableData = (Nat, Int);
+  public type StableData = (Nat, Int, Bool);
 
   /// Stream recevier receiving chunks on `onChunk` call,
   /// validating whether `length` in chunk message corresponds to `length` inside `StreamRecevier`,
@@ -39,12 +39,13 @@ module {
     };
 
     /// Share data in order to store in stable varible. No validation is performed.
-    public func share() : StableData = (length_, lastChunkReceived_);
+    public func share() : StableData = (length_, lastChunkReceived_, stopped_);
 
     /// Unhare data in order to store in stable varible. No validation is performed.
     public func unshare(data : StableData) {
       length_ := data.0;
       lastChunkReceived_ := data.1;
+      stopped_ := data.2;
     };
 
     /// Returns `#gap` if length in chunk don't correspond to length in `StreamReceiver`.
