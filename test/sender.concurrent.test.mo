@@ -33,16 +33,22 @@ class Chunk() {
 class Sender(n : Nat) {
   var chunkRegister : Chunk = Chunk();
   var correct = true;
+  var time = 0;
 
   func sendChunkMessage(message : StreamSender.ChunkMessage<?Text>) : async* StreamSender.ControlMessage {
     let chunk = chunkRegister;
+    // Debug.print(debug_show message);
     await chunk.run();
   };
 
   let sender = StreamSender.StreamSender<Text, ?Text>(
     Base.create(1),
     sendChunkMessage,
-    null,
+    ?{
+      keepAlive = ?(1, func() = time);
+      maxQueueSize = null;
+      maxConcurrentChunks = null;
+    },
   );
 
   public func send(chunk : Chunk) : async () {
@@ -52,7 +58,7 @@ class Sender(n : Nat) {
 
   public func expect(st : StreamSender.Status, received : Nat, sent : Nat) : () {
     let cond = sender.status() == st and sender.received() == received and sender.sent() == sent;
-    //Debug.print(debug_show (sender.status(), sender.received(), sender.sent()));
+    Debug.print(debug_show (sender.status(), sender.received(), sender.sent()));
     if (not cond) correct := false;
   };
 
@@ -60,9 +66,17 @@ class Sender(n : Nat) {
     assert correct;
   };
 
-  for (i in Iter.range(1, n)) {
-    Result.assertOk(sender.push("a"));
+  public func push(n : Nat) {
+    for (i in Iter.range(1, n)) {
+      Result.assertOk(sender.push("a"));
+    };
   };
+
+  public func setTime(t : Nat) {
+    time := t;
+  };
+
+  push(n);
 };
 
 // Note: We cannot pass futures across contexts, neither as arguments to
@@ -192,12 +206,12 @@ do {
     ([#gap, #gap], [(#paused, 0, 1), (#ready, 0, 0)]),
     ([#gap, #reject], [(#paused, 0, 1), (#ready, 0, 0)]),
     ([#gap, #stop], [(#stopped, 1, 1), (#shutdown, 1, 0)]),
-    
+
     ([#reject, #ok], [(#ready, 2, 2), (#shutdown, 2, 0)]),
     ([#reject, #gap], [(#paused, 0, 1), (#ready, 0, 0)]),
     ([#reject, #reject], [(#paused, 0, 1), (#ready, 0, 0)]),
     ([#reject, #stop], [(#stopped, 1, 1), (#shutdown, 1, 0)]),
-    
+
     ([#stop, #ok], [(#ready, 2, 2), (#shutdown, 2, 0)]),
     ([#stop, #gap], [(#paused, 0, 1), (#stopped, 0, 0)]),
     ([#stop, #reject], [(#paused, 0, 1), (#stopped, 0, 0)]),
@@ -234,6 +248,31 @@ do {
     await result[i];
     s.expect(#ready, i + 1, N);
   };
+
+  s.assert_();
+};
+
+// Test lost #ping
+do {
+  let n = 2;
+  let s = Sender(0);
+
+  let chunk = Array.tabulate<Chunk>(n, func(i) = Chunk());
+  var result = Array.init<async ()>(n, async ());
+
+  s.setTime(2);
+  result[0] := s.send(chunk[0]);
+  await async {};
+
+  s.push(3);
+  result[1] := s.send(chunk[1]);
+  chunk[1].release(#ok);
+  await result[1];
+  s.expect(#ready, 1, 1);
+
+  chunk[0].release(#reject);
+  await result[0];
+  s.expect(#ready, 1, 0);
 
   s.assert_();
 };
