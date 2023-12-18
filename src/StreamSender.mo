@@ -273,14 +273,12 @@ module {
     public func restart() : async Bool {
       if (shutdown) return false;
       if (paused) return false;
-      stopped := false;
       let res = try {
         await* sendFunc((head, #restart));
-      } catch (_) return false;
+      } catch (_) { #error };
       switch (res) {
-        case (#ok) true;
-        case (#gap) false;
-        case (#stop) false;
+        case (#ok) { stopped := false; true };
+        case (#gap or #stop or #error) false;
       };
     };
 
