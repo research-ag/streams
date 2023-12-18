@@ -12,7 +12,7 @@ module {
 
   /// Argument of processing function.
   public type ChunkMessage<T> = Types.ChunkMessage<T>;
-  
+
   /// Type of `StableData` for `share`/`unshare` function.
   public type StableData = (Nat, Int);
 
@@ -53,7 +53,8 @@ module {
     public func onChunk(cm : Types.ChunkMessage<T>) : Types.ControlMessage {
       let (start, msg) = cm;
       if (start != length_) return #gap;
-      if (stopped()) return #stop;
+      updateTimeout();
+      if (stopped_) return #stop;
       switch (msg) {
         case (#chunk ch) {
           for (i in ch.keys()) {
@@ -63,17 +64,11 @@ module {
         };
         case (#ping) {};
       };
-      switch (timeout) {
-        case (?to) lastChunkReceived_ := Time.now();
-        case (_) {};
-      };
       return #ok;
     };
 
     /// Manually stop the receiver.
-    public func stop() {
-      stopped_ := true;
-    };
+    public func stop() { stopped_ := true };
 
     /// Current number of received items.
     public func length() : Nat = length_;
@@ -82,13 +77,20 @@ module {
     public func lastChunkReceived() : Int = lastChunkReceived_;
 
     /// Returns flag if receiver timed out because of non-activity or stopped.
-    public func stopped() : Bool {
-      stopped_ or (
-        switch (timeout) {
-          case (?to)(Time.now() - lastChunkReceived_) > to;
-          case (null) false;
-        }
-      );
+    public func isStopped() : Bool = stopped_;
+
+    func updateTimeout() {
+      switch (timeout) {
+        case (?to) {
+          let now = Time.now();
+          if ((now - lastChunkReceived_) > to) {
+            stopped_ := true;
+          } else {
+            lastChunkReceived_ := now;
+          };
+        };
+        case (_) {};
+      };
     };
   };
 };
