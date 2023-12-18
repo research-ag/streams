@@ -5,6 +5,7 @@ import Error "mo:base/Error";
 import Option "mo:base/Option";
 import Debug "mo:base/Debug";
 import Nat "mo:base/Nat";
+import Time "mo:base/Time";
 import Types "../src/types";
 
 // types for receiver actor
@@ -45,6 +46,7 @@ actor B {
         str #= "chunk [" # Nat.toText(e.size()) # "]";
         end := start + e.size();
       };
+      case (#restart) str #= "restart";
     };
     Debug.print(str # ")");
     str := ".   B reply: ";
@@ -127,6 +129,7 @@ actor A {
         str #= "chunk [" # Nat.toText(e.size()) # "]";
         end := start + e.size();
       };
+      case (#restart) str #= "restart";
     };
     Debug.print(str # ")");
     str := "A recv: [" # Nat.toText(start) # "-" # Nat.toText(end) # ") ";

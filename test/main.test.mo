@@ -19,7 +19,7 @@ func createReceiver() : Receiver<?Text> {
 
   let receiver = Receiver<?Text>(
     0,
-    ?(10 ** 9),
+    null,
     func(pos : Nat, item : ?Text) {
       assert pos == received.size();
       received.add(item);

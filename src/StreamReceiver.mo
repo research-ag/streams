@@ -26,16 +26,34 @@ module {
   /// * `itemCallback` function to be called on each received item.
   public class StreamReceiver<T>(
     startPos : Nat,
-    timeout : ?Nat,
+    timeout : ?(Nat, () -> Int),
     itemCallback : (pos : Nat, item : T) -> (),
     // itemCallback is custom made per-stream and contains the streamId
   ) {
     var stopped_ = false;
     var length_ : Nat = startPos;
 
-    var lastChunkReceived_ : Int = switch (timeout) {
-      case (?to) Time.now();
-      case (_) 0;
+    var lastChunkReceived_ : Int = 0;
+
+    func updateTime() {
+      switch (timeout) {
+        case (?to) lastChunkReceived_ := to.1 ();
+        case (_) {};
+      };
+    };
+
+    func updateTimeout() {
+      switch (timeout) {
+        case (?to) {
+          let now = to.1 ();
+          if ((now - lastChunkReceived_) > to.0) {
+            stopped_ := true;
+          } else {
+            lastChunkReceived_ := now;
+          };
+        };
+        case (_) {};
+      };
     };
 
     /// Share data in order to store in stable varible. No validation is performed.
@@ -56,7 +74,7 @@ module {
       if (start != length_) return #gap;
       switch (msg) {
         case (#restart) {
-          lastChunkReceived_ := Time.now();
+          updateTime();
           stopped_ := false;
         };
         case (#ping or #chunk _) {
@@ -87,19 +105,5 @@ module {
 
     /// Returns flag if receiver timed out because of non-activity or stopped.
     public func isStopped() : Bool = stopped_;
-
-    func updateTimeout() {
-      switch (timeout) {
-        case (?to) {
-          let now = Time.now();
-          if ((now - lastChunkReceived_) > to) {
-            stopped_ := true;
-          } else {
-            lastChunkReceived_ := now;
-          };
-        };
-        case (_) {};
-      };
-    };
   };
 };

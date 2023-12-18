@@ -27,17 +27,12 @@ module {
   public type Settings = {
     maxQueueSize : ?Nat;
     maxConcurrentChunks : ?Nat;
-    keepAliveSeconds : ?Nat;
+    keepAlive : ?(Nat, () -> Int);
   };
 
   /// Type of `StableData` for `share`/`unshare` function.
   public type StableData<T> = {
     buffer : SWB.StableData<T>;
-    settings_ : {
-      var maxQueueSize : ?Nat;
-      var maxConcurrentChunks : ?Nat;
-      var keepAliveSeconds : ?Nat;
-    };
     stopped : Bool;
     paused : Bool;
     head : Nat;
@@ -56,7 +51,8 @@ module {
   /// * `settings` consists of:
   ///   * `maxQueueSize` is maximum number of elements, which can simultaneously be in `StreamSender`'s queue. Default value is infinity.
   ///   * `maxConcurrentChunks` is maximum number of concurrent `sendChunk` calls. Default value is `MAX_CONCURRENT_CHUNKS_DEFAULT`.
-  ///   * `keepAliveSeconds` is period in seconds after which `StreamSender` should send ping chunk in case if there is no items to send. Default value means not to ping.
+  ///   * `keepAlive` is pair of period in seconds after which `StreamSender` should send ping chunk in case if there is no items to send and current time function.
+  ///     Default value means not to ping.
   public class StreamSender<T, S>(
     counterCreator : () -> { accept(item : T) : ?S },
     sendFunc : (x : Types.ChunkMessage<S>) -> async* Types.ControlMessage,
@@ -67,20 +63,22 @@ module {
     var settings_ = {
       var maxQueueSize = Option.flatten(Option.map(settings, func(s : Settings) : ?Nat = s.maxQueueSize));
       var maxConcurrentChunks = Option.flatten(Option.map(settings, func(s : Settings) : ?Nat = s.maxConcurrentChunks));
-      var keepAliveSeconds = Option.flatten(Option.map(settings, func(s : Settings) : ?Nat = s.keepAliveSeconds));
+      var keepAlive = Option.flatten(Option.map(settings, func(s : Settings) : ?(Nat, () -> Int) = s.keepAlive));
     };
 
     var stopped = false;
     var paused = false;
     var head : Nat = 0;
-    var lastChunkSent = Time.now();
+    var lastChunkSent = switch (settings_.keepAlive) {
+      case (?some) some.1 ();
+      case (null) 0;
+    };
     var concurrentChunks = 0;
     var shutdown = false;
 
     /// Share data in order to store in stable varible. No validation is performed.
     public func share() : StableData<T> = {
       buffer = buffer.share();
-      settings_ = settings_;
       stopped = stopped;
       paused = paused;
       head = head;
@@ -92,7 +90,6 @@ module {
     /// Unhare data in order to store in stable varible. No validation is performed.
     public func unshare(data : StableData<T>) {
       buffer.unshare(data.buffer);
-      settings_ := data.settings_;
       stopped := data.stopped;
       paused := data.paused;
       head := data.head;
@@ -186,8 +183,8 @@ module {
       let end = start + elements.size();
 
       func shouldPing() : Bool {
-        switch (settings_.keepAliveSeconds) {
-          case (?i) lastChunkSent + i * 1_000_000_000 < Time.now();
+        switch (settings_.keepAlive) {
+          case (?i) (i.1() - lastChunkSent) > i.0;
           case (null) false;
         };
       };
@@ -199,7 +196,10 @@ module {
         (start, #chunk elements);
       };
 
-      lastChunkSent := Time.now();
+      switch (settings_.keepAlive) {
+        case (?some) lastChunkSent := some.1 ();
+        case (null) {};
+      };
       concurrentChunks += 1;
 
       let res = try {
@@ -233,7 +233,7 @@ module {
           if (stopped) assert_(buffer.start() == start); // two stops must have the same start value
         };
         case (#error) if (end != start) assert_(buffer.start() <= start); // assert unless it was a ping
-        case (_) { };
+        case (_) {};
       };
       // assertions head
       switch (res) {
@@ -333,8 +333,8 @@ module {
     };
 
     /// Update max interval between stream calls.
-    public func setKeepAlive(seconds : ?Nat) {
-      settings_.keepAliveSeconds := seconds;
+    public func setKeepAlive(seconds : ?(Nat, () -> Int)) {
+      settings_.keepAlive := seconds;
     };
   };
 };
