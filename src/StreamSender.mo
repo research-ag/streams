@@ -275,10 +275,16 @@ module {
     };
 
     /// Restart the sender in case it's stopped after receiving `#stop` from `sendFunc`.
-    public func restart() : Bool {
+    public func restart() : async Bool {
       if (shutdown) return false;
-      stopped := false;
-      return true;
+      if (paused) return false;
+      let res = try {
+        await* sendFunc((head, #restart));
+      } catch (_) { #error };
+      switch (res) {
+        case (#ok) { stopped := false; true };
+        case (#gap or #stop or #error) false;
+      };
     };
 
     /// Total amount of items, ever added to the stream sender, also an index, which will be assigned to the next item

@@ -12,9 +12,9 @@ module {
 
   /// Argument of processing function.
   public type ChunkMessage<T> = Types.ChunkMessage<T>;
-  
+
   /// Type of `StableData` for `share`/`unshare` function.
-  public type StableData = (Nat, Int);
+  public type StableData = (Nat, Int, Bool);
 
   /// Stream recevier receiving chunks on `onChunk` call,
   /// validating whether `length` in chunk message corresponds to `length` inside `StreamRecevier`,
@@ -39,12 +39,13 @@ module {
     };
 
     /// Share data in order to store in stable varible. No validation is performed.
-    public func share() : StableData = (length_, lastChunkReceived_);
+    public func share() : StableData = (length_, lastChunkReceived_, stopped_);
 
     /// Unhare data in order to store in stable varible. No validation is performed.
     public func unshare(data : StableData) {
       length_ := data.0;
       lastChunkReceived_ := data.1;
+      stopped_ := data.2;
     };
 
     /// Returns `#gap` if length in chunk don't correspond to length in `StreamReceiver`.
@@ -53,7 +54,16 @@ module {
     public func onChunk(cm : Types.ChunkMessage<T>) : Types.ControlMessage {
       let (start, msg) = cm;
       if (start != length_) return #gap;
-      if (stopped()) return #stop;
+      switch (msg) {
+        case (#restart) {
+          lastChunkReceived_ := Time.now();
+          stopped_ := false;
+        };
+        case (#ping or #chunk _) {
+          updateTimeout();
+          if (stopped_) return #stop;
+        };
+      };
       switch (msg) {
         case (#chunk ch) {
           for (i in ch.keys()) {
@@ -61,19 +71,13 @@ module {
             length_ += 1;
           };
         };
-        case (#ping) {};
-      };
-      switch (timeout) {
-        case (?to) lastChunkReceived_ := Time.now();
-        case (_) {};
+        case (#ping or #restart) {};
       };
       return #ok;
     };
 
     /// Manually stop the receiver.
-    public func stop() {
-      stopped_ := true;
-    };
+    public func stop() { stopped_ := true };
 
     /// Current number of received items.
     public func length() : Nat = length_;
@@ -82,13 +86,20 @@ module {
     public func lastChunkReceived() : Int = lastChunkReceived_;
 
     /// Returns flag if receiver timed out because of non-activity or stopped.
-    public func stopped() : Bool {
-      stopped_ or (
-        switch (timeout) {
-          case (?to)(Time.now() - lastChunkReceived_) > to;
-          case (null) false;
-        }
-      );
+    public func isStopped() : Bool = stopped_;
+
+    func updateTimeout() {
+      switch (timeout) {
+        case (?to) {
+          let now = Time.now();
+          if ((now - lastChunkReceived_) > to) {
+            stopped_ := true;
+          } else {
+            lastChunkReceived_ := now;
+          };
+        };
+        case (_) {};
+      };
     };
   };
 };

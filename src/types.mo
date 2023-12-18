@@ -5,6 +5,7 @@ module {
     {
       #chunk : [T];
       #ping;
+      #restart;
     },
   );
   /// Return type of processing function.
