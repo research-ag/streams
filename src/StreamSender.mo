@@ -227,13 +227,18 @@ module {
 
       // assertions start
       switch (res) {
-        case (#gap or #stop or #error) assert_(buffer.start() <= start);
-        case (_) {};
+        case (#gap) assert_(buffer.start() <= start);
+        case (#stop) {
+          assert_(buffer.start() <= start);
+          if (stopped) assert_(buffer.start() == start); // two stops must have the same start value
+        };
+        case (#error) if (end != start) assert_(buffer.start() <= start); // assert unless it was a ping
+        case (_) { };
       };
       // assertions head
       switch (res) {
-        case (#ok or #stop) assert_(end <= head);
-        case (#gap) if (start < head) assert_(end <= head);
+        case (#ok) assert_(end <= head);
+        case (#gap or #stop) if (start < head) assert_(end <= head);
         case (_) {};
       };
       // assertions state
