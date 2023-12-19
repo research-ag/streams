@@ -174,25 +174,36 @@ do {
 };
 
 // two concurrent chunks respond in order
-await test([
-  (0, #ok, #ready, 1, 2),
-  (1, #ok, #ready, 2, 2),
-]);
+do {
+  let tests = [
+    ([#ok, #ok], [(#ready, 1, 2), (#ready, 2, 2)]),
+    ([#ok, #gap], [(#ready, 1, 2), (#shutdown, 1, 1)]),
+    ([#ok, #reject], [(#ready, 1, 2), (#ready, 1, 1)]),
+    ([#ok, #stop], [(#ready, 1, 2), (#stopped, 1, 1)]),
 
-await test([
-  (0, #stop, #stopped, 0, 0),
-  (1, #ok, #shutdown, 2, 0),
-]);
+    ([#gap, #ok], [(#shutdown, 0, 0), (#shutdown, 2, 0)]),
+    ([#gap, #gap], [(#shutdown, 0, 0), (#shutdown, 0, 0)]),
+    ([#gap, #reject], [(#shutdown, 0, 0), (#shutdown, 0, 0)]),
+    ([#gap, #stop], [(#shutdown, 0, 0), (#shutdown, 1, 0)]),
 
-await test([
-  (0, #gap, #shutdown, 0, 0),
-  (1, #gap, #shutdown, 0, 0),
-]);
+    ([#reject, #ok], [(#paused, 0, 0), (#shutdown, 2, 0)]),
+    ([#reject, #gap], [(#paused, 0, 0), (#ready, 0, 0)]),
+    ([#reject, #reject], [(#paused, 0, 0), (#ready, 0, 0)]),
+    ([#reject, #stop], [(#paused, 0, 0), (#shutdown, 1, 0)]),
 
-await test([
-  (0, #reject, #paused, 0, 0),
-  (1, #gap, #ready, 0, 0),
-]);
+    ([#stop, #ok], [(#stopped, 0, 0), (#shutdown, 2, 0)]),
+    ([#stop, #gap], [(#stopped, 0, 0), (#stopped, 0, 0)]),
+    ([#stop, #reject], [(#stopped, 0, 0), (#stopped, 0, 0)]),
+    ([#stop, #stop], [(#stopped, 0, 0), (#shutdown, 1, 0)]),
+  ];
+  for (t in tests.vals()) {
+    let (responses, statuses) = t;
+    await test([
+      (0, responses[0], statuses[0].0, statuses[0].1, statuses[0].2),
+      (1, responses[1], statuses[1].0, statuses[1].1, statuses[1].2),
+    ]);
+  };
+};
 
 // two concurrent chunks respond in reverse order
 do {

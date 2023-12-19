@@ -1,4 +1,3 @@
-import Debug "mo:base/Debug";
 import Error "mo:base/Error";
 import R "mo:base/Result";
 import Time "mo:base/Time";
@@ -236,13 +235,15 @@ module {
 
       if (res != #ok) pausing := true;
 
-      // assertions
+      // protocol-level assertions (are covered in tests)
       func assert_(condition : Bool) = if (not condition) shutdown := true;
+      assert_(ok <= head);
       assert_(buffer.start() <= retrace);
       if (retraceMoreLater) assert_(buffer.start() < retrace);
-      assert_(ok <= head);
-      if (retrace < head) assert_(end <= head); // need a new test to expose this case
-      if (not paused and pausing) assert_(retrace <= head); // need a new test to expose this case
+
+      // internal assertions (not covered in tests, would represent an internal bugs if triggered)
+      if (retrace < head) assert_(end <= head);
+      if (not paused and pausing) assert_(retrace <= head);
 
       // apply changes
       buffer.deleteTo(ok);
