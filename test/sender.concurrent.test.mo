@@ -287,3 +287,25 @@ do {
 
   s.assert_();
 };
+
+// Test swb rotation
+do {
+  let s = Sender(2);
+
+  let n = 4;
+  let chunk = Array.tabulate<Chunk>(n, func(i) = Chunk());
+  var result = Array.init<async ()>(n, async ());
+
+  result[0] := s.send(chunk[0]);
+  result[1] := s.send(chunk[1]);
+  chunk[1].release(#ok);
+  await result[1];
+  s.expect(#ready, 2, 2);
+  s.push(1);
+  result[2] := s.send(chunk[2]);
+  chunk[2].release(#reject);
+  await result[2];
+  s.expect(#ready, 2, 2);
+  chunk[0].release(#ok);
+  await result[0];
+};
