@@ -146,7 +146,7 @@ func test(sequence : [Item]) : async () {
 do {
   let tests = [
     (#ok, #ready, 1, 1),
-    (#gap, #ready, 0, 0),
+    (#gap, #shutdown, 0, 0),
     (#reject, #ready, 0, 0),
     (#stop, #stopped, 0, 0),
   ];
@@ -185,8 +185,8 @@ await test([
 ]);
 
 await test([
-  (0, #gap, #paused, 0, 0),
-  (1, #gap, #ready, 0, 0),
+  (0, #gap, #shutdown, 0, 0),
+  (1, #gap, #shutdown, 0, 0),
 ]);
 
 await test([
@@ -203,8 +203,8 @@ do {
     ([#ok, #stop], [(#stopped, 1, 1), (#stopped, 1, 1)]),
 
     ([#gap, #ok], [(#ready, 2, 2), (#shutdown, 2, 0)]),
-    ([#gap, #gap], [(#paused, 0, 1), (#ready, 0, 0)]),
-    ([#gap, #reject], [(#paused, 0, 1), (#ready, 0, 0)]),
+    ([#gap, #gap], [(#paused, 0, 1), (#shutdown, 0, 0)]),
+    ([#gap, #reject], [(#paused, 0, 1), (#shutdown, 0, 0)]),
     ([#gap, #stop], [(#stopped, 1, 1), (#shutdown, 1, 0)]),
 
     ([#reject, #ok], [(#ready, 2, 2), (#shutdown, 2, 0)]),

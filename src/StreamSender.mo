@@ -239,7 +239,7 @@ module {
       // assertions
       func assert_(condition : Bool) = if (not condition) shutdown := true;
       assert_(buffer.start() <= retrace);
-      // if (retraceMoreLater) assert_(buffer.start() < retrace); // need to adjust tests to enable this one
+      if (retraceMoreLater) assert_(buffer.start() < retrace);
       assert_(ok <= head);
       if (retrace < head) assert_(end <= head); // need a new test to expose this case
       if (not paused and pausing) assert_(retrace <= head); // need a new test to expose this case
