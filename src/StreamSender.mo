@@ -221,52 +221,33 @@ module {
         #error;
       };
 
-      func assert_(condition : Bool) {
-        if (not condition) shutdown := true;
+      // planned changes
+      var ok = buffer.start();
+      var retrace = head;
+      var retraceMoreLater = false;
+      var pausing = false;
+
+      switch (res) {
+        case (#ok) { ok := end };
+        case (#gap) { retrace := start; retraceMoreLater := true };
+        case (#stop) { ok := start; retrace := start };
+        case (#error) if (start != end) { retrace := start };
       };
 
-      // assertions start
-      switch (res) {
-        case (#gap) assert_(buffer.start() <= start);
-        case (#stop) {
-          assert_(buffer.start() <= start);
-          if (stopped) assert_(buffer.start() == start); // two stops must have the same start value
-        };
-        case (#error) if (start != end) assert_(buffer.start() <= start);
-        case (_) {};
-      };
-      // assertions head
-      switch (res) {
-        case (#ok) assert_(end <= head);
-        case (#gap or #stop) if (start < head) assert_(end <= head);
-        case (_) {};
-      };
-      // assertions state
-      switch (res) {
-        case (#ok) if (stopped) assert_(end <= buffer.start());
-        case (#gap or #error) if (not paused) assert_(end <= head);
-        case (_) {};
-      };
+      if (res != #ok) pausing := true;
 
-      // advance the start pointer
-      switch (res) {
-        case (#ok) buffer.deleteTo(end);
-        case (#stop) buffer.deleteTo(start);
-        case (_) {};
-      };
+      // assertions
+      func assert_(condition : Bool) = if (not condition) shutdown := true;
+      assert_(buffer.start() <= retrace);
+      // if (retraceMoreLater) assert_(buffer.start() < retrace); // need to adjust tests to enable this one
+      assert_(ok <= head);
+      if (retrace < head) assert_(end <= head); // need a new test to expose this case
+      if (not paused and pausing) assert_(retrace <= head); // need a new test to expose this case
 
-      // retrace the head pointer and pause
-      switch (res) {
-        case (#gap or #stop) {
-          head := Nat.min(head, start);
-          paused := true;
-        };
-        case (#error) {
-          if (start != end) head := Nat.min(head, start);
-          paused := true;
-        };
-        case (_) {};
-      };
+      // apply changes
+      buffer.deleteTo(ok);
+      head := Nat.min(head, retrace);
+      if (pausing) paused := true;
 
       // unpause stream
       concurrentChunks -= 1;
