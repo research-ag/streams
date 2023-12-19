@@ -184,7 +184,7 @@ module {
 
       func shouldPing() : Bool {
         switch (settings_.keepAlive) {
-          case (?i) (i.1() - lastChunkSent) > i.0;
+          case (?i)(i.1 () - lastChunkSent) > i.0;
           case (null) false;
         };
       };
@@ -232,7 +232,7 @@ module {
           assert_(buffer.start() <= start);
           if (stopped) assert_(buffer.start() == start); // two stops must have the same start value
         };
-        case (#error) if (end != start) assert_(buffer.start() <= start); // assert unless it was a ping
+        case (#error) if (start != end) assert_(buffer.start() <= start);
         case (_) {};
       };
       // assertions head
@@ -257,8 +257,12 @@ module {
 
       // retrace the head pointer and pause
       switch (res) {
-        case (#gap or #stop or #error) {
+        case (#gap or #stop) {
           head := Nat.min(head, start);
+          paused := true;
+        };
+        case (#error) {
+          if (start != end) head := Nat.min(head, start);
           paused := true;
         };
         case (_) {};

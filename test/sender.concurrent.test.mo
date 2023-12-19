@@ -272,7 +272,7 @@ do {
 
   chunk[0].release(#reject);
   await result[0];
-  s.expect(#ready, 1, 0);
+  s.expect(#ready, 1, 1);
 
   s.assert_();
 };
