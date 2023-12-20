@@ -4,6 +4,10 @@ import Debug "mo:base/Debug";
 import Error "mo:base/Error";
 import Iter "mo:base/Iter";
 import Array "mo:base/Array";
+import Int "mo:base/Int";
+import Nat "mo:base/Nat";
+import Random "mo:base/Random";
+import Option "mo:base/Option";
 import Base "sender.base";
 // Note: A chunk response of #trap (aka canister_error) cannot be simulated with
 // the moc interpreter. Calling Debug.trap() to generate the error would
@@ -58,7 +62,7 @@ class Sender(n : Nat) {
 
   public func expect(st : StreamSender.Status, received : Nat, sent : Nat) : () {
     let cond = sender.status() == st and sender.received() == received and sender.sent() == sent;
-    Debug.print(debug_show (sender.status(), sender.received(), sender.sent()));
+    // Debug.print(debug_show (sender.status(), sender.received(), sender.sent()));
     if (not cond) correct := false;
   };
 
@@ -76,7 +80,60 @@ class Sender(n : Nat) {
     time := t;
   };
 
+  public func setMaxN(n : ?Nat) {
+    sender.setMaxConcurrentChunks(n);
+  };
+
   push(n);
+};
+
+// randomized max test
+do {
+  class RNG() {
+    var seed = 0;
+
+    public func next() : Nat {
+      seed += 29;
+      let a = seed * 15485863;
+      a * a * a % 2038074743;
+    };
+  };
+
+  func random_permutation(n : Nat) : [var Nat] {
+    let p = Array.thaw<Nat>(Iter.toArray(Iter.range(0, n - 1)));
+    let rng = RNG();
+    for (ii in Iter.revRange(n - 1, 0)) {
+      let i = Int.abs(ii);
+      let j = rng.next() % n;
+      let x = p[i];
+      p[i] := p[j];
+      p[j] := x;
+    };
+
+    p
+  };
+
+  let n = 100;
+  let p = random_permutation(n);
+  let s = Sender(n);
+  s.setMaxN(?(n + 1));
+  let chunk = Array.tabulate<Chunk>(n, func(i) = Chunk());
+  var result = Array.init<async ()>(n, async ());
+
+  for (i in Iter.range(0, n - 1)) {
+    result[i] := s.send(chunk[i]);
+    await async {};
+    s.expect(#ready, 0, i + 1);
+  };
+
+  var max = 0;
+  for (index in p.vals()) {
+    max := Nat.max(max, index);
+    chunk[index].release(#ok);
+    await result[index];
+    s.expect(#ready, max + 1, n);
+  };
+  s.assert_();
 };
 
 // Note: We cannot pass futures across contexts, neither as arguments to
@@ -146,7 +203,7 @@ func test(sequence : [Item]) : async () {
 do {
   let tests = [
     (#ok, #ready, 1, 1),
-    (#gap, #ready, 0, 0),
+    (#gap, #shutdown, 0, 0),
     (#reject, #ready, 0, 0),
     (#stop, #stopped, 0, 0),
   ];
@@ -174,25 +231,36 @@ do {
 };
 
 // two concurrent chunks respond in order
-await test([
-  (0, #ok, #ready, 1, 2),
-  (1, #ok, #ready, 2, 2),
-]);
+do {
+  let tests = [
+    ([#ok, #ok], [(#ready, 1, 2), (#ready, 2, 2)]),
+    ([#ok, #gap], [(#ready, 1, 2), (#shutdown, 1, 1)]),
+    ([#ok, #reject], [(#ready, 1, 2), (#ready, 1, 1)]),
+    ([#ok, #stop], [(#ready, 1, 2), (#stopped, 1, 1)]),
 
-await test([
-  (0, #stop, #stopped, 0, 0),
-  (1, #ok, #shutdown, 2, 0),
-]);
+    ([#gap, #ok], [(#shutdown, 0, 0), (#shutdown, 2, 0)]),
+    ([#gap, #gap], [(#shutdown, 0, 0), (#shutdown, 0, 0)]),
+    ([#gap, #reject], [(#shutdown, 0, 0), (#shutdown, 0, 0)]),
+    ([#gap, #stop], [(#shutdown, 0, 0), (#shutdown, 1, 0)]),
 
-await test([
-  (0, #gap, #paused, 0, 0),
-  (1, #gap, #ready, 0, 0),
-]);
+    ([#reject, #ok], [(#paused, 0, 0), (#shutdown, 2, 0)]),
+    ([#reject, #gap], [(#paused, 0, 0), (#ready, 0, 0)]),
+    ([#reject, #reject], [(#paused, 0, 0), (#ready, 0, 0)]),
+    ([#reject, #stop], [(#paused, 0, 0), (#shutdown, 1, 0)]),
 
-await test([
-  (0, #reject, #paused, 0, 0),
-  (1, #gap, #ready, 0, 0),
-]);
+    ([#stop, #ok], [(#stopped, 0, 0), (#shutdown, 2, 0)]),
+    ([#stop, #gap], [(#stopped, 0, 0), (#stopped, 0, 0)]),
+    ([#stop, #reject], [(#stopped, 0, 0), (#stopped, 0, 0)]),
+    ([#stop, #stop], [(#stopped, 0, 0), (#shutdown, 1, 0)]),
+  ];
+  for (t in tests.vals()) {
+    let (responses, statuses) = t;
+    await test([
+      (0, responses[0], statuses[0].0, statuses[0].1, statuses[0].2),
+      (1, responses[1], statuses[1].0, statuses[1].1, statuses[1].2),
+    ]);
+  };
+};
 
 // two concurrent chunks respond in reverse order
 do {
@@ -203,8 +271,8 @@ do {
     ([#ok, #stop], [(#stopped, 1, 1), (#stopped, 1, 1)]),
 
     ([#gap, #ok], [(#ready, 2, 2), (#shutdown, 2, 0)]),
-    ([#gap, #gap], [(#paused, 0, 1), (#ready, 0, 0)]),
-    ([#gap, #reject], [(#paused, 0, 1), (#ready, 0, 0)]),
+    ([#gap, #gap], [(#paused, 0, 1), (#shutdown, 0, 0)]),
+    ([#gap, #reject], [(#paused, 0, 1), (#shutdown, 0, 0)]),
     ([#gap, #stop], [(#stopped, 1, 1), (#shutdown, 1, 0)]),
 
     ([#reject, #ok], [(#ready, 2, 2), (#shutdown, 2, 0)]),
@@ -272,7 +340,29 @@ do {
 
   chunk[0].release(#reject);
   await result[0];
-  s.expect(#ready, 1, 0);
+  s.expect(#ready, 1, 1);
 
   s.assert_();
+};
+
+// Test swb rotation
+do {
+  let s = Sender(2);
+
+  let n = 4;
+  let chunk = Array.tabulate<Chunk>(n, func(i) = Chunk());
+  var result = Array.init<async ()>(n, async ());
+
+  result[0] := s.send(chunk[0]);
+  result[1] := s.send(chunk[1]);
+  chunk[1].release(#ok);
+  await result[1];
+  s.expect(#ready, 2, 2);
+  s.push(1);
+  result[2] := s.send(chunk[2]);
+  chunk[2].release(#reject);
+  await result[2];
+  s.expect(#ready, 2, 2);
+  chunk[0].release(#ok);
+  await result[0];
 };
