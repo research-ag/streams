@@ -12,7 +12,7 @@ import Base "sender.base";
 // Note: A chunk response of #trap (aka canister_error) cannot be simulated with
 // the moc interpreter. Calling Debug.trap() to generate the error would
 // instantly terminate the whole test.
-type ChunkResponse = { #ok; #gap; #stop; #reject };
+type ChunkResponse = { #ok; #gap; #stop; #error };
 
 class Chunk() {
   var response : ?ChunkResponse = null;
@@ -23,7 +23,7 @@ class Chunk() {
       case (? #ok) #ok;
       case (? #gap) #gap;
       case (? #stop) #stop;
-      case (? #reject) throw Error.reject("");
+      case (? #error) throw Error.reject("");
       case (null) Debug.trap("cannot happen");
     };
   };
@@ -62,7 +62,7 @@ class Sender(n : Nat) {
 
   public func expect(st : StreamSender.Status, received : Nat, sent : Nat) : () {
     let cond = sender.status() == st and sender.received() == received and sender.sent() == sent;
-    // Debug.print(debug_show (sender.status(), sender.received(), sender.sent()));
+    Debug.print(debug_show (sender.status(), sender.received(), sender.sent()));
     if (not cond) correct := false;
   };
 
@@ -99,9 +99,10 @@ do {
     };
   };
 
+  let rng = RNG();
+
   func random_permutation(n : Nat) : [var Nat] {
     let p = Array.thaw<Nat>(Iter.toArray(Iter.range(0, n - 1)));
-    let rng = RNG();
     for (ii in Iter.revRange(n - 1, 0)) {
       let i = Int.abs(ii);
       let j = rng.next() % n;
@@ -110,11 +111,13 @@ do {
       p[j] := x;
     };
 
-    p
+    p;
   };
 
   let n = 100;
   let p = random_permutation(n);
+  // drop first
+  let drop = Array.tabulate<Nat>(n, func(i) = if (i == 1) 0 else rng.next() % 2);
   let s = Sender(n);
   s.setMaxN(?(n + 1));
   let chunk = Array.tabulate<Chunk>(n, func(i) = Chunk());
@@ -128,10 +131,14 @@ do {
 
   var max = 0;
   for (index in p.vals()) {
-    max := Nat.max(max, index);
-    chunk[index].release(#ok);
+    chunk[index].release(
+      if (drop[index] == 0) {
+        max := Nat.max(max, index);
+        #ok;
+      } else { #error }
+    );
     await result[index];
-    s.expect(#ready, max + 1, n);
+    s.expect(#paused, max + 1, n);
   };
   s.assert_();
 };
@@ -204,7 +211,7 @@ do {
   let tests = [
     (#ok, #ready, 1, 1),
     (#gap, #shutdown, 0, 0),
-    (#reject, #ready, 0, 0),
+    (#error, #ready, 0, 0),
     (#stop, #stopped, 0, 0),
   ];
   for (t in tests.vals()) {
@@ -218,7 +225,7 @@ do {
   let tests = [
     (#ok, #shutdown, 2, 0),
     (#gap, #stopped, 0, 0),
-    (#reject, #stopped, 0, 0),
+    (#error, #stopped, 0, 0),
     (#stop, #shutdown, 1, 0),
   ];
   for (t in tests.vals()) {
@@ -235,22 +242,22 @@ do {
   let tests = [
     ([#ok, #ok], [(#ready, 1, 2), (#ready, 2, 2)]),
     ([#ok, #gap], [(#ready, 1, 2), (#shutdown, 1, 1)]),
-    ([#ok, #reject], [(#ready, 1, 2), (#ready, 1, 1)]),
+    ([#ok, #error], [(#ready, 1, 2), (#ready, 1, 1)]),
     ([#ok, #stop], [(#ready, 1, 2), (#stopped, 1, 1)]),
 
     ([#gap, #ok], [(#shutdown, 0, 0), (#shutdown, 2, 0)]),
     ([#gap, #gap], [(#shutdown, 0, 0), (#shutdown, 0, 0)]),
-    ([#gap, #reject], [(#shutdown, 0, 0), (#shutdown, 0, 0)]),
+    ([#gap, #error], [(#shutdown, 0, 0), (#shutdown, 0, 0)]),
     ([#gap, #stop], [(#shutdown, 0, 0), (#shutdown, 1, 0)]),
 
-    ([#reject, #ok], [(#paused, 0, 0), (#shutdown, 2, 0)]),
-    ([#reject, #gap], [(#paused, 0, 0), (#ready, 0, 0)]),
-    ([#reject, #reject], [(#paused, 0, 0), (#ready, 0, 0)]),
-    ([#reject, #stop], [(#paused, 0, 0), (#shutdown, 1, 0)]),
+    ([#error, #ok], [(#paused, 0, 0), (#shutdown, 2, 0)]),
+    ([#error, #gap], [(#paused, 0, 0), (#ready, 0, 0)]),
+    ([#error, #error], [(#paused, 0, 0), (#ready, 0, 0)]),
+    ([#error, #stop], [(#paused, 0, 0), (#shutdown, 1, 0)]),
 
     ([#stop, #ok], [(#stopped, 0, 0), (#shutdown, 2, 0)]),
     ([#stop, #gap], [(#stopped, 0, 0), (#stopped, 0, 0)]),
-    ([#stop, #reject], [(#stopped, 0, 0), (#stopped, 0, 0)]),
+    ([#stop, #error], [(#stopped, 0, 0), (#stopped, 0, 0)]),
     ([#stop, #stop], [(#stopped, 0, 0), (#shutdown, 1, 0)]),
   ];
   for (t in tests.vals()) {
@@ -267,22 +274,22 @@ do {
   let tests = [
     ([#ok, #ok], [(#ready, 2, 2), (#ready, 2, 2)]),
     ([#ok, #gap], [(#paused, 0, 1), (#ready, 1, 1)]),
-    ([#ok, #reject], [(#paused, 0, 1), (#ready, 1, 1)]),
+    ([#ok, #error], [(#paused, 0, 1), (#ready, 1, 1)]),
     ([#ok, #stop], [(#stopped, 1, 1), (#stopped, 1, 1)]),
 
     ([#gap, #ok], [(#ready, 2, 2), (#shutdown, 2, 0)]),
     ([#gap, #gap], [(#paused, 0, 1), (#shutdown, 0, 0)]),
-    ([#gap, #reject], [(#paused, 0, 1), (#shutdown, 0, 0)]),
+    ([#gap, #error], [(#paused, 0, 1), (#shutdown, 0, 0)]),
     ([#gap, #stop], [(#stopped, 1, 1), (#shutdown, 1, 0)]),
 
-    ([#reject, #ok], [(#ready, 2, 2), (#shutdown, 2, 0)]),
-    ([#reject, #gap], [(#paused, 0, 1), (#ready, 0, 0)]),
-    ([#reject, #reject], [(#paused, 0, 1), (#ready, 0, 0)]),
-    ([#reject, #stop], [(#stopped, 1, 1), (#shutdown, 1, 0)]),
+    ([#error, #ok], [(#ready, 2, 2), (#shutdown, 2, 0)]),
+    ([#error, #gap], [(#paused, 0, 1), (#ready, 0, 0)]),
+    ([#error, #error], [(#paused, 0, 1), (#ready, 0, 0)]),
+    ([#error, #stop], [(#stopped, 1, 1), (#shutdown, 1, 0)]),
 
     ([#stop, #ok], [(#ready, 2, 2), (#shutdown, 2, 0)]),
     ([#stop, #gap], [(#paused, 0, 1), (#stopped, 0, 0)]),
-    ([#stop, #reject], [(#paused, 0, 1), (#stopped, 0, 0)]),
+    ([#stop, #error], [(#paused, 0, 1), (#stopped, 0, 0)]),
     ([#stop, #stop], [(#stopped, 1, 1), (#shutdown, 1, 0)]),
   ];
   for (t in tests.vals()) {
@@ -338,7 +345,7 @@ do {
   await result[1];
   s.expect(#ready, 1, 1);
 
-  chunk[0].release(#reject);
+  chunk[0].release(#error);
   await result[0];
   s.expect(#ready, 1, 1);
 
@@ -360,7 +367,7 @@ do {
   s.expect(#ready, 2, 2);
   s.push(1);
   result[2] := s.send(chunk[2]);
-  chunk[2].release(#reject);
+  chunk[2].release(#error);
   await result[2];
   s.expect(#ready, 2, 2);
   chunk[0].release(#ok);
