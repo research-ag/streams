@@ -4,6 +4,10 @@ import Debug "mo:base/Debug";
 import Error "mo:base/Error";
 import Iter "mo:base/Iter";
 import Array "mo:base/Array";
+import Int "mo:base/Int";
+import Nat "mo:base/Nat";
+import Random "mo:base/Random";
+import Option "mo:base/Option";
 import Base "sender.base";
 // Note: A chunk response of #trap (aka canister_error) cannot be simulated with
 // the moc interpreter. Calling Debug.trap() to generate the error would
@@ -58,7 +62,7 @@ class Sender(n : Nat) {
 
   public func expect(st : StreamSender.Status, received : Nat, sent : Nat) : () {
     let cond = sender.status() == st and sender.received() == received and sender.sent() == sent;
-    Debug.print(debug_show (sender.status(), sender.received(), sender.sent()));
+    // Debug.print(debug_show (sender.status(), sender.received(), sender.sent()));
     if (not cond) correct := false;
   };
 
@@ -76,7 +80,60 @@ class Sender(n : Nat) {
     time := t;
   };
 
+  public func setMaxN(n : ?Nat) {
+    sender.setMaxConcurrentChunks(n);
+  };
+
   push(n);
+};
+
+// randomized max test
+do {
+  class RNG() {
+    var seed = 0;
+
+    public func next() : Nat {
+      seed += 29;
+      let a = seed * 15485863;
+      a * a * a % 2038074743;
+    };
+  };
+
+  func random_permutation(n : Nat) : [var Nat] {
+    let p = Array.thaw<Nat>(Iter.toArray(Iter.range(0, n - 1)));
+    let rng = RNG();
+    for (ii in Iter.revRange(n - 1, 0)) {
+      let i = Int.abs(ii);
+      let j = rng.next() % n;
+      let x = p[i];
+      p[i] := p[j];
+      p[j] := x;
+    };
+
+    p
+  };
+
+  let n = 100;
+  let p = random_permutation(n);
+  let s = Sender(n);
+  s.setMaxN(?(n + 1));
+  let chunk = Array.tabulate<Chunk>(n, func(i) = Chunk());
+  var result = Array.init<async ()>(n, async ());
+
+  for (i in Iter.range(0, n - 1)) {
+    result[i] := s.send(chunk[i]);
+    await async {};
+    s.expect(#ready, 0, i + 1);
+  };
+
+  var max = 0;
+  for (index in p.vals()) {
+    max := Nat.max(max, index);
+    chunk[index].release(#ok);
+    await result[index];
+    s.expect(#ready, max + 1, n);
+  };
+  s.assert_();
 };
 
 // Note: We cannot pass futures across contexts, neither as arguments to
