@@ -9,6 +9,7 @@ import Nat "mo:base/Nat";
 import Random "mo:base/Random";
 import Option "mo:base/Option";
 import Base "sender.base";
+import StreamReceiver "../src/StreamReceiver";
 // Note: A chunk response of #trap (aka canister_error) cannot be simulated with
 // the moc interpreter. Calling Debug.trap() to generate the error would
 // instantly terminate the whole test.
@@ -84,6 +85,8 @@ class Sender(n : Nat) {
     sender.setMaxConcurrentChunks(n);
   };
 
+  public func status() : StreamSender.Status = sender.status();
+
   push(n);
 };
 
@@ -99,10 +102,9 @@ do {
     };
   };
 
-  let rng = RNG();
-
   func random_permutation(n : Nat) : [var Nat] {
     let p = Array.thaw<Nat>(Iter.toArray(Iter.range(0, n - 1)));
+    let rng = RNG();
     for (ii in Iter.revRange(n - 1, 0)) {
       let i = Int.abs(ii);
       let j = rng.next() % n;
@@ -116,9 +118,9 @@ do {
 
   let n = 100;
   let p = random_permutation(n);
-  // drop first
-  let drop = Array.tabulate<Nat>(n, func(i) = if (i == 1) 0 else rng.next() % 2);
   let s = Sender(n);
+  let r = StreamReceiver.StreamReceiver<()>(0, null, func(pos : Nat, item : ()) = ());
+
   s.setMaxN(?(n + 1));
   let chunk = Array.tabulate<Chunk>(n, func(i) = Chunk());
   var result = Array.init<async ()>(n, async ());
@@ -131,16 +133,11 @@ do {
 
   var max = 0;
   for (index in p.vals()) {
-    chunk[index].release(
-      if (drop[index] == 0) {
-        max := Nat.max(max, index);
-        #ok;
-      } else { #error }
-    );
+    let response = r.onChunk(index, #chunk([()]));
+    chunk[index].release(response);
     await result[index];
-    s.expect(#paused, max + 1, n);
   };
-  s.assert_();
+  assert s.status() == #ready;
 };
 
 // Note: We cannot pass futures across contexts, neither as arguments to
