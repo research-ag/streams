@@ -95,7 +95,7 @@ class Sender(n : Nat) {
   push(n);
 };
 
-do {
+func allCases(n : Nat) : async () {
   func next_permutation(p : [var Nat]) : Bool {
     let n = p.size();
 
@@ -159,8 +159,6 @@ do {
     true;
   };
 
-  let n = 4;
-
   func getResponses(p : [var Nat], a : [var Bool]) : [ChunkResponse] {
     let r = StreamReceiver.StreamReceiver<()>(0, null, func(pos : Nat, item : ()) = ());
 
@@ -202,14 +200,19 @@ do {
     let a = Array.init<Bool>(n, false);
     label l1 loop {
       if (not (await test(p, getResponses(p, a)))) {
-        Debug.print(debug_show p);
-        Debug.print(debug_show a);
+        Debug.print(debug_show (p, a));
         assert false;
       };
 
       if (not next_choose(a)) break l1;
     };
     if (not next_permutation(p)) break l;
+  };
+};
+
+do {
+  for (i in Iter.range(2, 4)) {
+    await allCases(i);
   };
 };
 
