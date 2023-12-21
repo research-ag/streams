@@ -77,7 +77,7 @@ module {
           updateTime();
           stopped_ := false;
         };
-        case (#ping or #chunk _) {
+        case (#chunk _) {
           updateTimeout();
           if (stopped_) return #stop;
         };
@@ -89,7 +89,7 @@ module {
             length_ += 1;
           };
         };
-        case (#ping or #restart) {};
+        case (#restart) {};
       };
       return #ok;
     };

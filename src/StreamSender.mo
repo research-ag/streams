@@ -188,12 +188,9 @@ module {
         };
       };
 
-      let chunkMessage = if (elements.size() == 0) {
-        if (not shouldPing()) return;
-        (start, #ping);
-      } else {
-        (start, #chunk elements);
-      };
+
+      if (elements.size() == 0 and not shouldPing()) return;
+      let chunkMessage = (start, #chunk elements);
 
       switch (settings_.keepAlive) {
         case (?some) lastChunkSent := some.1 ();
