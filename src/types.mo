@@ -4,7 +4,6 @@ module {
     length : Nat,
     {
       #chunk : [T];
-      #ping;
       #restart;
     },
   );
