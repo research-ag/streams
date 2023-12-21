@@ -35,6 +35,11 @@ class Chunk() {
   };
 };
 
+// Note: We cannot pass futures across contexts, neither as arguments to
+// functions nor return them from functions. We cannot read or write the
+// global result[] array from within a function either. That's why it is hard to
+// shorten the commands below with any kind of convenience function.
+
 class Sender(n : Nat) {
   var chunkRegister : Chunk = Chunk();
   var correct = true;
@@ -90,6 +95,124 @@ class Sender(n : Nat) {
   push(n);
 };
 
+do {
+  func next_permutation(p : [var Nat]) : Bool {
+    let n = p.size();
+
+    func swap(i : Nat, j : Nat) {
+      let x = p[i];
+      p[i] := p[j];
+      p[j] := x;
+    };
+
+    func reverse(from : Nat, to : Nat) {
+      var a = from;
+      var b = to;
+      while (a < b) {
+        swap(a, b);
+        a += 1;
+        b -= 1;
+      };
+    };
+
+    var point : ?Nat = null;
+    var i : Int = n - 2;
+    label l while (i >= 0) {
+      if (p[Int.abs(i)] < p[Int.abs(i + 1)]) {
+        point := ?Int.abs(i);
+        break l;
+      };
+      i -= 1;
+    };
+    switch (point) {
+      case (null) {
+        return false;
+      };
+      case (?x) {
+        var i : Int = n - 1;
+        label l while (i > x) {
+          if (p[Int.abs(i)] > p[x]) {
+            break l;
+          };
+          i -= 1;
+        };
+        swap(Int.abs(i), x);
+        reverse(x + 1, n - 1);
+      };
+    };
+    true;
+  };
+
+  func next_choose(a : [var Bool]) : Bool {
+    let n = a.size();
+    var i = 0;
+    while (i < n and a[i]) {
+      i += 1;
+    };
+    if (i == n) return false;
+    a[i] := true;
+    var j = 0;
+    while (j < i) {
+      a[j] := false;
+      j += 1;
+    };
+    true;
+  };
+
+  let n = 4;
+
+  func getResponses(p : [var Nat], a : [var Bool]) : [ChunkResponse] {
+    let r = StreamReceiver.StreamReceiver<()>(0, null, func(pos : Nat, item : ()) = ());
+
+    Iter.toArray(
+      Iter.map(
+        Iter.range(0, n - 1),
+        func(i : Nat) : ChunkResponse {
+          if (a[i]) {
+            r.onChunk(p[i], #chunk([()]));
+          } else {
+            #error;
+          };
+        },
+      )
+    );
+  };
+
+  func test(p : [var Nat], responses : [ChunkResponse]) : async Bool {
+    let s = Sender(n);
+    s.setMaxN(?(n + 1));
+
+    let chunk = Array.tabulate<Chunk>(n, func(i) = Chunk());
+    var result = Array.init<async ()>(n, async ());
+
+    for (i in Iter.range(0, n - 1)) {
+      result[i] := s.send(chunk[i]);
+      await async {};
+    };
+
+    for (i in Iter.range(0, n - 1)) {
+      chunk[p[i]].release(responses[i]);
+      await result[p[i]];
+    };
+    s.status() == #ready;
+  };
+
+  let p = Array.thaw<Nat>(Iter.toArray(Iter.range(0, n - 1)));
+  label l loop {
+    let a = Array.init<Bool>(n, false);
+    label l1 loop {
+      if (not (await test(p, getResponses(p, a)))) {
+        Debug.print(debug_show p);
+        Debug.print(debug_show a);
+        assert false;
+      };
+
+      if (not next_choose(a)) break l1;
+    };
+    if (not next_permutation(p)) break l;
+  };
+};
+
 // randomized max test
 do {
   class RNG() {
@@ -139,11 +262,6 @@ do {
   };
   assert s.status() == #ready;
 };
-
-// Note: We cannot pass futures across contexts, neither as arguments to
-// functions nor return them from functions. We cannot read or write the
-// global result[] array from within a function either. That's why it is hard to
-// shorten the commands below with any kind of convenience function.
 
 type ItemA = ({ #send; #release : (Nat, ChunkResponse) }, StreamSender.Status, Nat, Nat);
 
