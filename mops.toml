@@ -13,3 +13,6 @@ vector = "0.2.0"
 
 [dev-dependencies]
 test = "1.2.0"
+
+[toolchain]
+moc = "0.10.3"
