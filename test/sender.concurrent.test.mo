@@ -144,7 +144,7 @@ func allCases(n : Nat) : async () {
     true;
   };
 
-  func getResponses(p : [var Nat], a : Nat) : [ChunkResponse] {
+  func getResponses(a : Nat) : [ChunkResponse] {
     let r = StreamReceiver.StreamReceiver<()>(0, null, func(pos : Nat, item : ()) = ());
     let a_ = Nat32.fromNat(a);
     Iter.toArray(
@@ -180,11 +180,13 @@ func allCases(n : Nat) : async () {
     s.status() == #ready;
   };
 
-  let p = Array.thaw<Nat>(Iter.toArray(Iter.range(0, n - 1)));
+  let responseSeq = Array.tabulate<[ChunkResponse]>(2**n, func(i) = getResponses(i));
+
+  let p = Array.tabulateVar<Nat>(n, func(i) = i);
   label l loop {
-    for (a in Iter.range(0,2**n - 1)) {
-      if (not (await test(p, getResponses(p,a)))) {
-        Debug.print(debug_show (p, a, getResponses(p,a)));
+    for (i in Iter.range(0,2**n - 1)) {
+      if (not (await test(p, responseSeq[i]))) {
+        Debug.print(debug_show (p, i, responseSeq[i]));
         assert false;
       };
     };
