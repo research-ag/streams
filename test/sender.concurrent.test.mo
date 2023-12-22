@@ -167,7 +167,7 @@ func allCases(n : Nat) : async () {
         Iter.range(0, n - 1),
         func(i : Nat) : ChunkResponse {
           if (a[i]) {
-            r.onChunk(p[i], #chunk([()]));
+            r.onChunk(i, #chunk([()]));
           } else {
             #error;
           };
@@ -185,11 +185,11 @@ func allCases(n : Nat) : async () {
 
     for (i in Iter.range(0, n - 1)) {
       result[i] := s.send(chunk[i]);
-      await async {};
     };
+    await async {};
 
     for (i in Iter.range(0, n - 1)) {
-      chunk[p[i]].release(responses[i]);
+      chunk[p[i]].release(responses[p[i]]);
       await result[p[i]];
     };
     s.status() == #ready;
@@ -199,8 +199,8 @@ func allCases(n : Nat) : async () {
   label l loop {
     let a = Array.init<Bool>(n, false);
     label l1 loop {
-      if (not (await test(p, getResponses(p, a)))) {
-        Debug.print(debug_show (p, a));
+      if (not (await test(p, getResponses(p,a)))) {
+        Debug.print(debug_show (p, a, getResponses(p,a)));
         assert false;
       };
 
