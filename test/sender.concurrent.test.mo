@@ -151,7 +151,7 @@ func allCases(n : Nat) : async () {
       Iter.map(
         Iter.range(0, n - 1),
         func(i : Nat) : ChunkResponse {
-          if (Nat32.bittest(a_,i)) {
+          if (Nat32.bittest(a_, i)) {
             r.onChunk(i, #chunk([()]));
           } else {
             #error;
@@ -180,11 +180,11 @@ func allCases(n : Nat) : async () {
     s.status() == #ready;
   };
 
-  let responseSeq = Array.tabulate<[ChunkResponse]>(2**n, func(i) = getResponses(i));
+  let responseSeq = Array.tabulate<[ChunkResponse]>(2 ** n, func(i) = getResponses(i));
 
   let p = Array.tabulateVar<Nat>(n, func(i) = i);
   label l loop {
-    for (i in Iter.range(0,2**n - 1)) {
+    for (i in Iter.range(0, 2 ** n - 1)) {
       if (not (await test(p, responseSeq[i]))) {
         Debug.print(debug_show (p, i, responseSeq[i]));
         assert false;
