@@ -6,6 +6,7 @@ import Iter "mo:base/Iter";
 import Array "mo:base/Array";
 import Int "mo:base/Int";
 import Nat "mo:base/Nat";
+import Nat32 "mo:base/Nat32";
 import Random "mo:base/Random";
 import Option "mo:base/Option";
 import Base "sender.base";
@@ -143,30 +144,14 @@ func allCases(n : Nat) : async () {
     true;
   };
 
-  func next_choose(a : [var Bool]) : Bool {
-    let n = a.size();
-    var i = 0;
-    while (i < n and a[i]) {
-      i += 1;
-    };
-    if (i == n) return false;
-    a[i] := true;
-    var j = 0;
-    while (j < i) {
-      a[j] := false;
-      j += 1;
-    };
-    true;
-  };
-
-  func getResponses(p : [var Nat], a : [var Bool]) : [ChunkResponse] {
+  func getResponses(a : Nat) : [ChunkResponse] {
     let r = StreamReceiver.StreamReceiver<()>(0, null, func(pos : Nat, item : ()) = ());
-
+    let a_ = Nat32.fromNat(a);
     Iter.toArray(
       Iter.map(
         Iter.range(0, n - 1),
         func(i : Nat) : ChunkResponse {
-          if (a[i]) {
+          if (Nat32.bittest(a_, i)) {
             r.onChunk(i, #chunk([()]));
           } else {
             #error;
@@ -195,16 +180,15 @@ func allCases(n : Nat) : async () {
     s.status() == #ready;
   };
 
-  let p = Array.thaw<Nat>(Iter.toArray(Iter.range(0, n - 1)));
+  let responseSeq = Array.tabulate<[ChunkResponse]>(2 ** n, func(i) = getResponses(i));
+
+  let p = Array.tabulateVar<Nat>(n, func(i) = i);
   label l loop {
-    let a = Array.init<Bool>(n, false);
-    label l1 loop {
-      if (not (await test(p, getResponses(p,a)))) {
-        Debug.print(debug_show (p, a, getResponses(p,a)));
+    for (i in Iter.range(0, 2 ** n - 1)) {
+      if (not (await test(p, responseSeq[i]))) {
+        Debug.print(debug_show (p, i, responseSeq[i]));
         assert false;
       };
-
-      if (not next_choose(a)) break l1;
     };
     if (not next_permutation(p)) break l;
   };
