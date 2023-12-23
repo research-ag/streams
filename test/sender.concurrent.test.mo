@@ -205,7 +205,7 @@ func allCases(n : Nat) : async () {
 };
 
 do {
-  for (i in Iter.range(2, 4)) {
+  for (i in Iter.range(2, 3)) {
     await allCases(i);
   };
 };

@@ -1,9 +1,6 @@
 import Error "mo:base/Error";
-import R "mo:base/Result";
-import Time "mo:base/Time";
-import Array "mo:base/Array";
 import Option "mo:base/Option";
-import Nat "mo:base/Nat";
+import { min } "mo:base/Nat";
 import Result "mo:base/Result";
 import SWB "mo:swb";
 import Vector "mo:vector";
@@ -247,7 +244,7 @@ module {
 
       // apply changes
       buffer.deleteTo(ok);
-      head := Nat.min(head, retrace);
+      head := min(head, retrace);
       if (pausing) paused := true;
 
       // unpause stream
