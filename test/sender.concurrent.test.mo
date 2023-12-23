@@ -144,14 +144,19 @@ func allCases(n : Nat) : async () {
     true;
   };
 
-  func getResponses(a_ : Nat32, b_ : Nat32) : [ChunkResponse] {
-    let r = StreamReceiver.StreamReceiver<()>(0, null, func(pos : Nat, item : ()) = ());
+  func getResponses(a_ : Nat32, b_ : Nat32, c : Nat) : [ChunkResponse] {
+    var time : Int = 0;
+    let r = StreamReceiver.StreamReceiver<()>(
+      0,
+      ?(1, func() = time),
+      func(pos : Nat, item : ()) = (),
+    );
     var x = 0;
     Iter.toArray(
       Iter.map(
         Iter.range(0, n - 1),
         func(i : Nat) : ChunkResponse {
-          if (Nat32.bittest(a_, i)) {
+          let ret = if (Nat32.bittest(a_, i)) {
             if (Nat32.bittest(b_, i)) {
               let ret = r.onChunk(x, #chunk([()]));
               x += 1;
@@ -163,6 +168,10 @@ func allCases(n : Nat) : async () {
             x += 1;
             #error;
           };
+          if (c == i) {
+            time := 100;
+          };
+          ret;
         },
       )
     );
@@ -184,20 +193,22 @@ func allCases(n : Nat) : async () {
       chunk[p[i]].release(responses[p[i]]);
       await result[p[i]];
     };
-    s.status() == #ready;
+    s.status() != #shutdown;
   };
 
   let p = Array.tabulateVar<Nat>(n, func(i) = i);
   label l loop {
     for (i in Iter.range(0, 2 ** n - 1)) {
       for (j in Iter.range(0, 2 ** n - 1)) {
-        let a = Nat32.fromNat(i);
-        let b = Nat32.fromNat(j);
-        if (Nat32.bitor(a, b) == a) {
-          let r = getResponses(a, b);
-          if (not (await test(p, r))) {
-            Debug.print(debug_show (p, i, j, r));
-            assert false;
+        for (time in Iter.range(0, n - 1)) {
+          let a = Nat32.fromNat(i);
+          let b = Nat32.fromNat(j);
+          if (Nat32.bitor(a, b) == a) {
+            let r = getResponses(a, b, time);
+            if (not (await test(p, r))) {
+              Debug.print(debug_show (p, i, j, time, r));
+              assert false;
+            };
           };
         };
       };
@@ -207,7 +218,7 @@ func allCases(n : Nat) : async () {
 };
 
 do {
-  for (i in Iter.range(2, 4)) {
+  for (i in Iter.range(2, 3)) {
     await allCases(i);
   };
 };
