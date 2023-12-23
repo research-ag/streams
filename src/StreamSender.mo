@@ -1,6 +1,6 @@
 import Error "mo:base/Error";
 import Option "mo:base/Option";
-import { min } "mo:base/Nat";
+import Nat "mo:base/Nat";
 import Result "mo:base/Result";
 import SWB "mo:swb";
 import Vector "mo:vector";
@@ -30,10 +30,10 @@ module {
   public type StableData<T> = {
     buffer : SWB.StableData<T>;
     stopped : Bool;
-    paused : Bool;
+    //    paused : Bool;
     head : Nat;
     lastChunkSent : Int;
-    concurrentChunks : Nat;
+    //    concurrentChunks : Nat;
     shutdown : Bool;
   };
   /// Stream sender receiving items of type `T` with `push` function and sending them with `sendFunc` callback when calling `sendChunk`.
@@ -57,29 +57,33 @@ module {
     let buffer = SWB.SlidingWindowBuffer<T>();
 
     var settings_ = {
-      var maxQueueSize = Option.flatten(Option.map(settings, func(s : Settings) : ?Nat = s.maxQueueSize));
-      var maxConcurrentChunks = Option.flatten(Option.map(settings, func(s : Settings) : ?Nat = s.maxConcurrentChunks));
-      var keepAlive = Option.flatten(Option.map(settings, func(s : Settings) : ?(Nat, () -> Int) = s.keepAlive));
+      var maxQueueSize = Option.chain<Settings, Nat>(settings, func s = s.maxQueueSize);
+      var maxConcurrentChunks = Option.chain<Settings, Nat>(settings, func s = s.maxConcurrentChunks);
+      var keepAlive = Option.chain<Settings, (Nat, () -> Int)> (settings, func s = s.keepAlive);
     };
 
     var stopped = false;
     var paused = false;
     var head : Nat = 0;
-    var lastChunkSent = switch (settings_.keepAlive) {
-      case (?some) some.1 ();
-      case (null) 0;
-    };
+    var lastChunkSent : Int = 0;
     var concurrentChunks = 0;
     var shutdown = false;
+
+    func updateTime() {
+      let ?arg = settings_.keepAlive else return;
+      lastChunkSent := arg.1 ();
+    };
+
+    updateTime();
 
     /// Share data in order to store in stable varible. No validation is performed.
     public func share() : StableData<T> = {
       buffer = buffer.share();
       stopped = stopped;
-      paused = paused;
+      //      paused = paused;
       head = head;
       lastChunkSent = lastChunkSent;
-      concurrentChunks = concurrentChunks;
+      //      concurrentChunks = concurrentChunks;
       shutdown = shutdown;
     };
 
@@ -87,23 +91,22 @@ module {
     public func unshare(data : StableData<T>) {
       buffer.unshare(data.buffer);
       stopped := data.stopped;
-      paused := data.paused;
+      //      paused := data.paused;
       head := data.head;
       lastChunkSent := data.lastChunkSent;
-      concurrentChunks := data.concurrentChunks;
+      //      concurrentChunks := data.concurrentChunks;
       shutdown := data.shutdown;
+    };
+
+    func isQueueFull() : Bool {
+      let ?max = settings_.maxQueueSize else return false;
+      return buffer.len() >= max;
     };
 
     /// Add item to the `StreamSender`'s queue. Return number of succesfull `push` call, or error in case of lack of space.
     public func push(item : T) : Result.Result<Nat, { #NoSpace }> {
-      func isQueueFull() : Bool = switch (settings_.maxQueueSize) {
-        case (?max) buffer.len() >= max;
-        case (null) false;
-      };
-
-      if (isQueueFull()) { #err(#NoSpace) } else {
-        #ok(buffer.add(item));
-      };
+      if (isQueueFull()) #err(#NoSpace) else
+      #ok(buffer.add(item));
     };
 
     /// Get the stream sender's status for inspection.
@@ -132,9 +135,9 @@ module {
     /// `#ready` means that the stream sender is ready to send a chunk.
 
     public func status() : Status {
-      if (isShutdown()) return #shutdown;
-      if (isStopped()) return #stopped;
-      if (isPaused()) return #paused;
+      if (shutdown) return #shutdown;
+      if (stopped) return #stopped;
+      if (paused) return #paused;
       if (isBusy()) return #busy;
       return #ready;
     };
@@ -148,13 +151,11 @@ module {
     /// If the stream sender is not ready (shutdown, stopped, paused or busy) then the
     /// function throws immediately and does not attempt to send the chunk.
     public func sendChunk() : async* () {
-      switch (status()) {
-        case (#shutdown) throw Error.reject("Sender shut down");
-        case (#stopped) throw Error.reject("Stream stopped by receiver");
-        case (#paused) throw Error.reject("Stream is paused");
-        case (#busy) throw Error.reject("Stream is busy");
-        case (#ready) {};
-      };
+      if (shutdown) throw Error.reject("Sender shut down");
+      if (stopped) throw Error.reject("Stream stopped by receiver");
+      if (paused) throw Error.reject("Stream is paused");
+      if (isBusy()) throw Error.reject("Stream is busy");
+
       let start = head;
       let elements = do {
         var end = head;
@@ -176,30 +177,22 @@ module {
         Vector.toArray(vec);
       };
 
-      let end = start + elements.size();
+      let size = elements.size();
 
       func shouldPing() : Bool {
-        switch (settings_.keepAlive) {
-          case (?i)(i.1 () - lastChunkSent) > i.0;
-          case (null) false;
-        };
+        let ?arg = settings_.keepAlive else return false;
+        return (arg.1 () - lastChunkSent) > arg.0;
       };
 
-      let chunkMessage = if (elements.size() == 0) {
-        if (not shouldPing()) return;
-        (start, #ping);
-      } else {
-        (start, #chunk elements);
-      };
+      if (size == 0 and not shouldPing()) return;
 
-      switch (settings_.keepAlive) {
-        case (?some) lastChunkSent := some.1 ();
-        case (null) {};
-      };
+      let msg = if (size > 0) #chunk elements else #ping;
+
+      updateTime();
       concurrentChunks += 1;
 
       let res = try {
-        await* sendFunc(chunkMessage);
+        await* sendFunc((start, msg));
       } catch (e) {
         // shutdown on permanent system errors
         switch (Error.code(e)) {
@@ -223,6 +216,8 @@ module {
       var retraceMoreLater = false;
       var pausing = false;
 
+      let end = start + size;
+
       switch (res) {
         case (#ok) { ok := end };
         case (#gap) { retrace := start; retraceMoreLater := true };
@@ -244,7 +239,7 @@ module {
 
       // apply changes
       buffer.deleteTo(ok);
-      head := min(head, retrace);
+      head := Nat.min(head, retrace);
       if (pausing) paused := true;
 
       // unpause stream
