@@ -152,28 +152,26 @@ func allCases(n : Nat) : async () {
       func(pos : Nat, item : ()) = (),
     );
     var x = 0;
-    Iter.toArray(
-      Iter.map(
-        Iter.range(0, n - 1),
-        func(i : Nat) : ChunkResponse {
-          let ret = if (Nat32.bittest(a_, i)) {
-            if (Nat32.bittest(b_, i)) {
-              let ret = r.onChunk(x, #chunk([()]));
-              x += 1;
-              ret;
-            } else {
-              r.onChunk(x, #ping);
-            };
-          } else {
+    Array.tabulate<ChunkResponse>(
+      n,
+      func(i) {
+        let ret = if (Nat32.bittest(a_, i)) {
+          if (Nat32.bittest(b_, i)) {
+            let ret = r.onChunk(x, #chunk([()]));
             x += 1;
-            #error;
+            ret;
+          } else {
+            r.onChunk(x, #ping);
           };
-          if (c == i) {
-            time := 100;
-          };
-          ret;
-        },
-      )
+        } else {
+          x += 1;
+          #error;
+        };
+        if (c == i) {
+          time := 100;
+        };
+        ret;
+      },
     );
   };
 
