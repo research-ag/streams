@@ -1,8 +1,3 @@
-import Debug "mo:base/Debug";
-import Error "mo:base/Error";
-import R "mo:base/Result";
-import Array "mo:base/Array";
-import Option "mo:base/Option";
 import SWB "mo:swb";
 import Types "types";
 
@@ -17,12 +12,12 @@ module {
   /// Stream length, last chunk received timestamp, stopped flag.
   public type StableData = (Nat, Int, Bool);
 
-  /// StreamReceiver
+  /// StreamReceiver  
   /// * receives chunk by `onChunk` call
   /// * validates `start` position in ChunkMessage (must match internal `length` variable)
   /// * calls `itemCallback` for each item of the chunk.
   ///
-  /// Constructor arguments:
+  /// Constructor arguments:  
   /// * `startPos` is starting length
   /// * `timeout` is maximum waiting time between onChunk calls (default = infinite)
   /// * `itemCallback` function
@@ -46,7 +41,6 @@ module {
     func resetTimeout() {
       let ?arg = timeoutArg else return;
       lastChunkReceived_ := arg.1 ();
-      stopped_ := false;
     };
 
     /// Share data in order to store in stable varible. No validation is performed.
@@ -71,26 +65,27 @@ module {
           checkTime();
           if (stopped_) return #stop;
         };
-        case (#restart) resetTimeout();
+        case (#restart) {
+          resetTimeout();
+          stopped_ := false;
+        };
       };
       let #chunk ch = msg else return #ok;
-      for (i in ch.keys()) {
-        itemCallback(start + i, ch[i]);
-        length_ += 1;
-      };
+      for (i in ch.keys()) itemCallback(start + i, ch[i]);
+      length_ += ch.size();
       return #ok;
     };
 
     /// Manually stop the receiver.
-    public func stop() { stopped_ := true };
+    public func stop() = stopped_ := true;
 
     /// Current number of received items.
     public func length() : Nat = length_;
 
-    /// Returns timestamp when stream received last chunk
+    /// Timestamp when stream received last chunk
     public func lastChunkReceived() : Int = lastChunkReceived_;
 
-    /// Returns flag if receiver timed out because of non-activity or stopped.
+    /// Flag if receiver is stopped (manually or by inactivity timeout)
     public func isStopped() : Bool = stopped_;
   };
 };

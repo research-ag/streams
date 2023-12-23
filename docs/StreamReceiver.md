@@ -16,25 +16,27 @@ Argument of processing function.
 
 ## Type `StableData`
 ``` motoko no-repl
-type StableData = (Nat, Int)
+type StableData = (Nat, Int, Bool)
 ```
 
 Type of `StableData` for `share`/`unshare` function.
+Stream length, last chunk received timestamp, stopped flag.
 
 ## Class `StreamReceiver<T>`
 
 ``` motoko no-repl
-class StreamReceiver<T>(startPos : Nat, timeout : ?Nat, itemCallback : (pos : Nat, item : T) -> ())
+class StreamReceiver<T>(startPos : Nat, timeoutArg : ?(Nat, () -> Int), itemCallback : (pos : Nat, item : T) -> ())
 ```
 
-Stream recevier receiving chunks on `onChunk` call,
-validating whether `length` in chunk message corresponds to `length` inside `StreamRecevier`,
-calling `itemCallback` on each items of the chunk.
+StreamReceiver  
+* receives chunk by `onChunk` call
+* validates `start` position in ChunkMessage (must match internal `length` variable)
+* calls `itemCallback` for each item of the chunk.
 
-Arguments:
-* `startPos` is starting length.
-* `timeout` is maximum time between onChunk calls. Default time period is infinite.
-* `itemCallback` function to be called on each received item.
+Constructor arguments:  
+* `startPos` is starting length
+* `timeout` is maximum waiting time between onChunk calls (default = infinite)
+* `itemCallback` function
 
 ### Function `share`
 ``` motoko no-repl
@@ -57,9 +59,10 @@ Unhare data in order to store in stable varible. No validation is performed.
 func onChunk(cm : Types.ChunkMessage<T>) : Types.ControlMessage
 ```
 
-Returns `#gap` if length in chunk don't correspond to length in `StreamReceiver`.
-Returns `#stopped` if the receiver is already stopped or maximum time out between chunks exceeded.
+Returns `#gap` if start position in ChunkMessage does not match internal length.
+Returns `#stopped` if the receiver is already stopped or maximum waiting time between chunks is exceeded.
 Otherwise processes a chunk and call `itemCallback` on each item.
+A #ping message is handled equivalently to a #chunk of length zero.
 
 
 ### Function `stop`
@@ -83,12 +86,12 @@ Current number of received items.
 func lastChunkReceived() : Int
 ```
 
-Returns timestamp when stream received last chunk
+Timestamp when stream received last chunk
 
 
-### Function `stopped`
+### Function `isStopped`
 ``` motoko no-repl
-func stopped() : Bool
+func isStopped() : Bool
 ```
 
-Returns flag if receiver timed out because of non-activity or stopped.
+Flag if receiver is stopped (manually or by inactivity timeout)

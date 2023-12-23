@@ -30,14 +30,14 @@ Maximum concurrent chunks number.
 
 ## Type `Settings`
 ``` motoko no-repl
-type Settings = { maxQueueSize : ?Nat; maxConcurrentChunks : ?Nat; keepAliveSeconds : ?Nat }
+type Settings = { maxQueueSize : ?Nat; maxConcurrentChunks : ?Nat; keepAlive : ?(Nat, () -> Int) }
 ```
 
 Settings of `StreamSender`.
 
 ## Type `StableData`
 ``` motoko no-repl
-type StableData<T> = { buffer : SWB.StableData<T>; settings_ : { var maxQueueSize : ?Nat; var maxConcurrentChunks : ?Nat; var keepAliveSeconds : ?Nat }; stopped : Bool; paused : Bool; head : Nat; lastChunkSent : Int; concurrentChunks : Nat; shutdown : Bool }
+type StableData<T> = { buffer : SWB.StableData<T>; stopped : Bool; paused : Bool; head : Nat; lastChunkSent : Int; concurrentChunks : Nat; shutdown : Bool }
 ```
 
 Type of `StableData` for `share`/`unshare` function.
@@ -59,7 +59,8 @@ Typical implementation of `counter` is to accept items while their total size is
 * `settings` consists of:
   * `maxQueueSize` is maximum number of elements, which can simultaneously be in `StreamSender`'s queue. Default value is infinity.
   * `maxConcurrentChunks` is maximum number of concurrent `sendChunk` calls. Default value is `MAX_CONCURRENT_CHUNKS_DEFAULT`.
-  * `keepAliveSeconds` is period in seconds after which `StreamSender` should send ping chunk in case if there is no items to send. Default value means not to ping.
+  * `keepAlive` is pair of period in seconds after which `StreamSender` should send ping chunk in case if there is no items to send and current time function.
+    Default value means not to ping.
 
 ### Function `share`
 ``` motoko no-repl
@@ -133,7 +134,7 @@ function throws immediately and does not attempt to send the chunk.
 
 ### Function `restart`
 ``` motoko no-repl
-func restart() : Bool
+func restart() : async Bool
 ```
 
 Restart the sender in case it's stopped after receiving `#stop` from `sendFunc`.
@@ -237,7 +238,7 @@ Update max amount of concurrent outgoing requests.
 
 ### Function `setKeepAlive`
 ``` motoko no-repl
-func setKeepAlive(seconds : ?Nat)
+func setKeepAlive(seconds : ?(Nat, () -> Int))
 ```
 
 Update max interval between stream calls.
