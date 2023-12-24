@@ -155,26 +155,26 @@ func allCases(n : Nat) : async () {
     Array.tabulate<(ChunkResponse, ChunkRequest)>(
       n,
       func(i) {
-        let ret = if (Nat32.bittest(a_, i)) {
-          if (Nat32.bittest(b_, i)) {
-            let ret = (r.onChunk(x, #chunk([()])), #chunk);
-            x += 1;
-            ret;
+        let resp = if (Nat32.bittest(a_, i)) {
+          let m = if (Nat32.bittest(b_, i)) {
+            #chunk([()]);
           } else {
-            (r.onChunk(x, #ping), #ping);
+            #ping;
           };
+          r.onChunk(x, m);
         } else {
-          if (Nat32.bittest(b_, i)) {
-            x += 1;
-            (#error, #chunk);
-          } else {
-            (#error, #ping);
-          };
+          #error;
+        };
+        let req = if (Nat32.bittest(b_, i)) {
+          x += 1;
+          #chunk;
+        } else {
+          #ping;
         };
         if (c == i) {
           time := 100;
         };
-        ret;
+        (resp, req);
       },
     );
   };
