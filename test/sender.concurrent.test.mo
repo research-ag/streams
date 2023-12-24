@@ -143,8 +143,8 @@ func allCases(n : Nat) : async () {
     };
     true;
   };
-
-  func getResponses(a_ : Nat32, b_ : Nat32, c : Nat) : [ChunkResponse] {
+  type ChunkRequest = { #chunk; #ping };
+  func getResponses(a_ : Nat32, b_ : Nat32, c : Nat) : [(ChunkResponse, ChunkRequest)] {
     var time : Int = 0;
     let r = StreamReceiver.StreamReceiver<()>(
       0,
@@ -152,20 +152,24 @@ func allCases(n : Nat) : async () {
       func(pos : Nat, item : ()) = (),
     );
     var x = 0;
-    Array.tabulate<ChunkResponse>(
+    Array.tabulate<(ChunkResponse, ChunkRequest)>(
       n,
       func(i) {
         let ret = if (Nat32.bittest(a_, i)) {
           if (Nat32.bittest(b_, i)) {
-            let ret = r.onChunk(x, #chunk([()]));
+            let ret = (r.onChunk(x, #chunk([()])), #chunk);
             x += 1;
             ret;
           } else {
-            r.onChunk(x, #ping);
+            (r.onChunk(x, #ping), #ping);
           };
         } else {
-          x += 1;
-          #error;
+          if (Nat32.bittest(b_, i)) {
+            x += 1;
+            (#error, #chunk);
+          } else {
+            (#error, #ping);
+          };
         };
         if (c == i) {
           time := 100;
@@ -175,20 +179,28 @@ func allCases(n : Nat) : async () {
     );
   };
 
-  func test(p : [var Nat], responses : [ChunkResponse]) : async Bool {
-    let s = Sender(n);
+  func test(p : [var Nat], responses : [(ChunkResponse, ChunkRequest)]) : async Bool {
+    let s = Sender(0);
     s.setMaxN(?(n + 1));
 
     let chunk = Array.tabulate<Chunk>(n, func(i) = Chunk());
     var result = Array.init<async ()>(n, async ());
 
     for (i in Iter.range(0, n - 1)) {
+      switch (responses[i].1) {
+        case (#chunk) {
+          s.push(1);
+        };
+        case (#ping) {
+          s.setTime((i + 1) * 2);
+        };
+      };
       result[i] := s.send(chunk[i]);
+      await async {};
     };
-    await async {};
 
     for (i in Iter.range(0, n - 1)) {
-      chunk[p[i]].release(responses[p[i]]);
+      chunk[p[i]].release(responses[p[i]].0);
       await result[p[i]];
     };
     s.status() != #shutdown;
@@ -201,12 +213,10 @@ func allCases(n : Nat) : async () {
         for (time in Iter.range(0, n - 1)) {
           let a = Nat32.fromNat(i);
           let b = Nat32.fromNat(j);
-          if (Nat32.bitor(a, b) == a) {
-            let r = getResponses(a, b, time);
-            if (not (await test(p, r))) {
-              Debug.print(debug_show (p, i, j, time, r));
-              assert false;
-            };
+          let r = getResponses(a, b, time);
+          if (not (await test(p, r))) {
+            Debug.print(debug_show (p, i, j, time, r));
+            assert false;
           };
         };
       };
