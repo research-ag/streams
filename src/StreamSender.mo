@@ -39,15 +39,16 @@ module {
     concurrentChunks : Nat;
     shutdown : Bool;
   };
+
   /// Stream sender receiving items of type `T` with `push` function and sending them with `sendFunc` callback when calling `sendChunk`.
   ///
-  /// Arguments:
+  /// Arguments:  
   /// * `sendFunc` typically should implement sending chunk to the receiver canister.
   /// * `counterCreator` is used to create a chunk out of pushed items.
   /// `accept` function is called sequentially on items which are added to the chunk, until receiving `null`.
   /// If the item is accepted it should be converted to type `S`.
   /// Typical implementation of `counter` is to accept items while their total size is less then given maximum chunk size.
-  /// * `settings` consists of:
+  /// * `settings` consists of:  
   ///   * `maxQueueSize` is maximum number of elements, which can simultaneously be in `StreamSender`'s queue. Default value is infinity.
   ///   * `maxConcurrentChunks` is maximum number of concurrent `sendChunk` calls. Default value is `MAX_CONCURRENT_CHUNKS_DEFAULT`.
   ///   * `keepAlive` is pair of period in seconds after which `StreamSender` should send ping chunk in case if there is no items to send and current time function.
@@ -60,20 +61,29 @@ module {
     let buffer = SWB.SlidingWindowBuffer<T>();
 
     var settings_ = {
-      var maxQueueSize = Option.flatten(Option.map(settings, func(s : Settings) : ?Nat = s.maxQueueSize));
-      var maxConcurrentChunks = Option.flatten(Option.map(settings, func(s : Settings) : ?Nat = s.maxConcurrentChunks));
-      var keepAlive = Option.flatten(Option.map(settings, func(s : Settings) : ?(Nat, () -> Int) = s.keepAlive));
+      var maxQueueSize = Option.chain(settings, func(s : Settings) : ?Nat = s.maxQueueSize);
+      var maxConcurrentChunks = Option.chain(settings, func(s : Settings) : ?Nat = s.maxConcurrentChunks);
+      var keepAlive = Option.chain(settings, func(s : Settings) : ?(Nat, () -> Int) = s.keepAlive);
     };
+
+    func maxConcurrentChunks() : Nat = Option.get(
+      settings_.maxConcurrentChunks,
+      MAX_CONCURRENT_CHUNKS_DEFAULT,
+    );
 
     var stopped = false;
     var paused = false;
     var head : Nat = 0;
-    var lastChunkSent = switch (settings_.keepAlive) {
-      case (?some) some.1 ();
-      case (null) 0;
-    };
+    var lastChunkSent : Int = 0;
     var concurrentChunks = 0;
     var shutdown = false;
+
+    func updateTime() {
+      let ?arg = settings_.keepAlive else return;
+      lastChunkSent := arg.1 ();
+    };
+
+    updateTime();
 
     /// Share data in order to store in stable varible. No validation is performed.
     public func share() : StableData<T> = {
@@ -97,16 +107,15 @@ module {
       shutdown := data.shutdown;
     };
 
+    func isQueueFull() : Bool {
+      let ?max = settings_.maxQueueSize else return false;
+      buffer.len() >= max;
+    };
+
     /// Add item to the `StreamSender`'s queue. Return number of succesfull `push` call, or error in case of lack of space.
     public func push(item : T) : Result.Result<Nat, { #NoSpace }> {
-      func isQueueFull() : Bool = switch (settings_.maxQueueSize) {
-        case (?max) buffer.len() >= max;
-        case (null) false;
-      };
-
-      if (isQueueFull()) { #err(#NoSpace) } else {
-        #ok(buffer.add(item));
-      };
+      if (isQueueFull()) #err(#NoSpace) else
+      #ok(buffer.add item);
     };
 
     /// Get the stream sender's status for inspection.
@@ -135,10 +144,10 @@ module {
     /// `#ready` means that the stream sender is ready to send a chunk.
 
     public func status() : Status {
-      if (isShutdown()) return #shutdown;
-      if (isStopped()) return #stopped;
-      if (isPaused()) return #paused;
-      if (isBusy()) return #busy;
+      if (shutdown) return #shutdown;
+      if (stopped) return #stopped;
+      if (paused) return #paused;
+      if (concurrentChunks == maxConcurrentChunks()) return #busy;
       return #ready;
     };
 
@@ -151,58 +160,42 @@ module {
     /// If the stream sender is not ready (shutdown, stopped, paused or busy) then the
     /// function throws immediately and does not attempt to send the chunk.
     public func sendChunk() : async* () {
-      switch (status()) {
-        case (#shutdown) throw Error.reject("Sender shut down");
-        case (#stopped) throw Error.reject("Stream stopped by receiver");
-        case (#paused) throw Error.reject("Stream is paused");
-        case (#busy) throw Error.reject("Stream is busy");
-        case (#ready) {};
-      };
+      if (shutdown) throw Error.reject("Sender shut down");
+      if (stopped) throw Error.reject("Stream stopped by receiver");
+      if (paused) throw Error.reject("Stream is paused");
+      if (isBusy()) throw Error.reject("Stream is busy");
+
       let start = head;
       let elements = do {
         var end = head;
         let counter = counterCreator();
         let vec = Vector.new<S>();
-        label l loop {
-          switch (buffer.getOpt(end)) {
-            case (null) break l;
-            case (?item) {
-              switch (counter.accept(item)) {
-                case (?x) Vector.add(vec, x);
-                case (null) break l;
-              };
-              end += 1;
-            };
-          };
+        label fill loop {
+          let ?item = buffer.getOpt(end) else break fill;
+          let ?wrappedItem = counter.accept(item) else break fill;
+          Vector.add(vec, wrappedItem);
+          end += 1;
         };
         head := end;
         Vector.toArray(vec);
       };
 
-      let end = start + elements.size();
+      let size = elements.size();
 
       func shouldPing() : Bool {
-        switch (settings_.keepAlive) {
-          case (?i)(i.1 () - lastChunkSent) > i.0;
-          case (null) false;
-        };
+        let ?arg = settings_.keepAlive else return false;
+        (arg.1 () - lastChunkSent) > arg.0;
       };
 
-      let chunkMessage = if (elements.size() == 0) {
-        if (not shouldPing()) return;
-        (start, #ping);
-      } else {
-        (start, #chunk elements);
-      };
+      if (size == 0 and not shouldPing()) return;
 
-      switch (settings_.keepAlive) {
-        case (?some) lastChunkSent := some.1 ();
-        case (null) {};
-      };
+      let chunkMessage = if (size > 0) #chunk elements else #ping;
+
+      updateTime();
       concurrentChunks += 1;
 
       let res = try {
-        await* sendFunc(chunkMessage);
+        await* sendFunc((start, chunkMessage));
       } catch (e) {
         // shutdown on permanent system errors
         switch (Error.code(e)) {
@@ -220,41 +213,41 @@ module {
         #error;
       };
 
-      // planned changes
-      var ok = buffer.start();
-      var retrace = head;
+      // plan changes
+      var okTo = buffer.start();
+      var retraceTo = head;
       var retraceMoreLater = false;
-      var pausing = false;
+      var pausingNow = false;
+
+      let end = start + size;
 
       switch (res) {
-        case (#ok) { ok := end };
-        case (#gap) { retrace := start; retraceMoreLater := true };
-        case (#stop) { ok := start; retrace := start };
-        case (#error) if (start != end) { retrace := start };
+        case (#ok) okTo := end;
+        case (#gap) { retraceTo := start; retraceMoreLater := true };
+        case (#stop) { okTo := start; retraceTo := start };
+        case (#error) if (start != end) retraceTo := start;
       };
 
-      if (res != #ok) pausing := true;
+      if (res != #ok) pausingNow := true;
 
       // protocol-level assertions (are covered in tests)
       func assert_(condition : Bool) = if (not condition) shutdown := true;
-      assert_(ok <= head);
-      assert_(buffer.start() <= retrace);
-      if (retraceMoreLater) assert_(buffer.start() < retrace);
+      assert_(okTo <= head);
+      assert_(buffer.start() <= retraceTo);
+      if (retraceMoreLater) assert_(buffer.start() < retraceTo);
 
       // internal assertions (not covered in tests, would represent an internal bugs if triggered)
-      if (retrace < head) assert_(end <= head);
-      if (not paused and pausing) assert_(retrace <= head);
+      if (retraceTo < head) assert_(end <= head);
+      if (not paused and pausingNow) assert_(retraceTo <= head);
 
       // apply changes
-      buffer.deleteTo(ok);
-      head := Nat.min(head, retrace);
-      if (pausing) paused := true;
+      buffer.deleteTo(okTo);
+      head := Nat.min(head, retraceTo);
+      if (pausingNow) paused := true;
 
       // unpause stream
       concurrentChunks -= 1;
-      if (concurrentChunks == 0) {
-        paused := false;
-      };
+      if (concurrentChunks == 0) paused := false;
 
       // stop stream
       if (res == #stop) stopped := true;
@@ -262,18 +255,34 @@ module {
 
     /// Restart the sender in case it's stopped after receiving `#stop` from `sendFunc`.
     public func restart() : async Bool {
-      if (shutdown) return false;
-      if (paused) return false;
+      if (shutdown or paused) return false;
       let res = try {
         await* sendFunc((head, #restart));
-      } catch (_) { #error };
-      switch (res) {
-        case (#ok) { stopped := false; true };
-        case (#gap or #stop or #error) false;
-      };
+      } catch (_) #error;
+      if (res == #ok) stopped := false;
+      return res == #ok;
     };
 
-    /// Total amount of items, ever added to the stream sender, also an index, which will be assigned to the next item
+    /// Update max queue size.
+    public func setMaxQueueSize(value : ?Nat) {
+      settings_.maxQueueSize := value;
+    };
+
+    /// Update max amount of concurrent outgoing requests.
+    public func setMaxConcurrentChunks(value : ?Nat) {
+      settings_.maxConcurrentChunks := value;
+    };
+
+    /// Update max interval between stream calls.
+    public func setKeepAlive(seconds : ?(Nat, () -> Int)) {
+      settings_.keepAlive := seconds;
+    };
+
+    // Query functions for internal state
+    // Should not be needed by normal users of the class
+
+    /// Total amount of items, ever added to the stream sender.
+    /// Equals the index which will be assigned to the next item.
     public func length() : Nat = buffer.end();
 
     /// Amount of items, which were sent to receiver.
@@ -295,12 +304,7 @@ module {
     public func isStopped() : Bool = stopped;
 
     /// Check busy status of sender.
-    public func isBusy() : Bool {
-      concurrentChunks == Option.get(
-        settings_.maxConcurrentChunks,
-        MAX_CONCURRENT_CHUNKS_DEFAULT,
-      );
-    };
+    public func isBusy() : Bool = concurrentChunks == maxConcurrentChunks();
 
     /// Check busy level of sender, e.g. current amount of outgoing calls in flight.
     public func busyLevel() : Nat = concurrentChunks;
@@ -308,19 +312,5 @@ module {
     /// Check paused status of sender.
     public func isPaused() : Bool = paused;
 
-    /// Update max queue size.
-    public func setMaxQueueSize(value : ?Nat) {
-      settings_.maxQueueSize := value;
-    };
-
-    /// Update max amount of concurrent outgoing requests.
-    public func setMaxConcurrentChunks(value : ?Nat) {
-      settings_.maxConcurrentChunks := value;
-    };
-
-    /// Update max interval between stream calls.
-    public func setKeepAlive(seconds : ?(Nat, () -> Int)) {
-      settings_.keepAlive := seconds;
-    };
   };
 };
