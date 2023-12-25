@@ -93,6 +93,8 @@ class Sender(n : Nat) {
 
   public func status() : StreamSender.Status = sender.status();
 
+  public func received() : Nat = sender.received();
+
   push(n);
 };
 
@@ -143,8 +145,10 @@ func allCases(n : Nat) : async () {
     };
     true;
   };
+  
   type ChunkRequest = { #chunk; #ping };
-  func getResponses(a_ : Nat32, b_ : Nat32, c : Nat) : [(ChunkResponse, ChunkRequest)] {
+  
+  func getResponses(a_ : Nat32, b_ : Nat32, c : Nat) : ([(ChunkResponse, ChunkRequest)], Nat) {
     var time : Int = 0;
     let r = StreamReceiver.StreamReceiver<()>(
       0,
@@ -152,7 +156,7 @@ func allCases(n : Nat) : async () {
       func(pos : Nat, item : ()) = (),
     );
     var x = 0;
-    Array.tabulate<(ChunkResponse, ChunkRequest)>(
+    let re = Array.tabulate<(ChunkResponse, ChunkRequest)>(
       n,
       func(i) {
         let resp = if (Nat32.bittest(a_, i)) {
@@ -177,9 +181,10 @@ func allCases(n : Nat) : async () {
         (resp, req);
       },
     );
+    (re, r.length());
   };
 
-  func test(p : [var Nat], responses : [(ChunkResponse, ChunkRequest)]) : async Bool {
+  func test(p : [var Nat], responses : [(ChunkResponse, ChunkRequest)], len : Nat) : async Bool {
     let s = Sender(0);
     s.setMaxN(?(n + 1));
 
@@ -203,7 +208,7 @@ func allCases(n : Nat) : async () {
       chunk[p[i]].release(responses[p[i]].0);
       await result[p[i]];
     };
-    s.status() != #shutdown;
+    s.status() != #shutdown and len == s.received();
   };
 
   let p = Array.tabulateVar<Nat>(n, func(i) = i);
@@ -213,8 +218,8 @@ func allCases(n : Nat) : async () {
         for (time in Iter.range(0, n - 1)) {
           let a = Nat32.fromNat(i);
           let b = Nat32.fromNat(j);
-          let r = getResponses(a, b, time);
-          if (not (await test(p, r))) {
+          let (r, l) = getResponses(a, b, time);
+          if (not (await test(p, r, l))) {
             Debug.print(debug_show (p, i, j, time, r));
             assert false;
           };
