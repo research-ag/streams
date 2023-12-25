@@ -3,6 +3,7 @@ import Error "mo:base/Error";
 import R "mo:base/Result";
 import Array "mo:base/Array";
 import Time "mo:base/Time";
+import Option "mo:base/Option";
 import SWB "mo:swb";
 import Types "types";
 
@@ -35,27 +36,6 @@ module {
 
     var lastChunkReceived_ : Int = 0;
 
-    func updateTime() {
-      switch (timeout) {
-        case (?to) lastChunkReceived_ := to.1 ();
-        case (_) {};
-      };
-    };
-
-    func updateTimeout() {
-      switch (timeout) {
-        case (?to) {
-          let now = to.1 ();
-          if ((now - lastChunkReceived_) > to.0) {
-            stopped_ := true;
-          } else {
-            lastChunkReceived_ := now;
-          };
-        };
-        case (_) {};
-      };
-    };
-
     /// Share data in order to store in stable varible. No validation is performed.
     public func share() : StableData = (length_, lastChunkReceived_, stopped_);
 
@@ -74,11 +54,21 @@ module {
       if (start != length_) return #gap;
       switch (msg) {
         case (#restart) {
-          updateTime();
+          Option.iterate(timeout, func(to : (Nat, () -> Int)) = lastChunkReceived_ := to.1 ());
           stopped_ := false;
         };
         case (#ping or #chunk _) {
-          updateTimeout();
+          Option.iterate(
+            timeout,
+            func(to : (Nat, () -> Int)) {
+              let now = to.1 ();
+              if ((now - lastChunkReceived_) > to.0) {
+                stopped_ := true;
+              } else {
+                lastChunkReceived_ := now;
+              };
+            },
+          );
           if (stopped_) return #stop;
         };
       };
