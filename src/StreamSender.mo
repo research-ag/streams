@@ -40,7 +40,7 @@ module {
     shutdown : Bool;
   };
 
-  /// Stream sender receiving items of type `T` with `push` function and sending them with `sendFunc` callback when calling `sendChunk`.
+  /// Stream sender receiving items of type `Q` with `push` function and sending them with `sendFunc` callback when calling `sendChunk`.
   ///
   /// Arguments:
   /// * `sendFunc` typically should implement sending chunk to the receiver canister.
@@ -53,12 +53,12 @@ module {
   ///   * `maxConcurrentChunks` is maximum number of concurrent `sendChunk` calls. Default value is `MAX_CONCURRENT_CHUNKS_DEFAULT`.
   ///   * `keepAlive` is pair of period in seconds after which `StreamSender` should send ping chunk in case if there is no items to send and current time function.
   ///     Default value means not to ping.
-  public class StreamSender<T, S>(
-    counterCreator : () -> { accept(item : T) : ?S },
+  public class StreamSender<Q, S>(
+    counterCreator : () -> { accept(item : Q) : ?S },
     sendFunc : (x : Types.ChunkMessage<S>) -> async* Types.ControlMessage,
     settings : ?Settings,
   ) {
-    let buffer = SWB.SlidingWindowBuffer<T>();
+    let buffer = SWB.SlidingWindowBuffer<Q>();
 
     let settings_ = {
       var maxQueueSize = Option.chain<Settings, Nat>(settings, func(s) = s.maxQueueSize);
@@ -85,7 +85,7 @@ module {
     updateTime();
 
     /// Share data in order to store in stable varible. No validation is performed.
-    public func share() : StableData<T> = {
+    public func share() : StableData<Q> = {
       buffer = buffer.share();
       stopped = stopped;
       paused = paused;
@@ -96,7 +96,7 @@ module {
     };
 
     /// Unhare data in order to store in stable varible. No validation is performed.
-    public func unshare(data : StableData<T>) {
+    public func unshare(data : StableData<Q>) {
       buffer.unshare(data.buffer);
       stopped := data.stopped;
       paused := data.paused;
@@ -112,7 +112,7 @@ module {
     };
 
     /// Add item to the `StreamSender`'s queue. Return number of succesfull `push` call, or error in case of lack of space.
-    public func push(item : T) : Result.Result<Nat, { #NoSpace }> {
+    public func push(item : Q) : Result.Result<Nat, { #NoSpace }> {
       if (isQueueFull()) #err(#NoSpace) else
       #ok(buffer.add item);
     };
@@ -291,7 +291,7 @@ module {
     public func received() : Nat = buffer.start();
 
     /// Get item from queue by index.
-    public func get(index : Nat) : ?T = buffer.getOpt(index);
+    public func get(index : Nat) : ?Q = buffer.getOpt(index);
 
     /// Returns flag is sender is ready.
     public func isReady() : Bool = status() == #ready;
