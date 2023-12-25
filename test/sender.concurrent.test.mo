@@ -143,58 +143,79 @@ func allCases(n : Nat) : async () {
     };
     true;
   };
-
-  func getResponses(a_ : Nat32, b_ : Nat32) : [ChunkResponse] {
-    let r = StreamReceiver.StreamReceiver<()>(0, null, func(pos : Nat, item : ()) = ());
+  type ChunkRequest = { #chunk; #ping };
+  func getResponses(a_ : Nat32, b_ : Nat32, c : Nat) : [(ChunkResponse, ChunkRequest)] {
+    var time : Int = 0;
+    let r = StreamReceiver.StreamReceiver<()>(
+      0,
+      ?(1, func() = time),
+      func(pos : Nat, item : ()) = (),
+    );
     var x = 0;
-    Array.tabulate<ChunkResponse>(
+    Array.tabulate<(ChunkResponse, ChunkRequest)>(
       n,
       func(i) {
-        if (Nat32.bittest(a_, i)) {
-          if (Nat32.bittest(b_, i)) {
-            let ret = r.onChunk(x, #chunk([()]));
-            x += 1;
-            ret;
+        let resp = if (Nat32.bittest(a_, i)) {
+          let m = if (Nat32.bittest(b_, i)) {
+            #chunk([()]);
           } else {
-            r.onChunk(x, #ping);
+            #ping;
           };
+          r.onChunk(x, m);
         } else {
-          x += 1;
           #error;
         };
+        let req = if (Nat32.bittest(b_, i)) {
+          x += 1;
+          #chunk;
+        } else {
+          #ping;
+        };
+        if (c == i) {
+          time := 100;
+        };
+        (resp, req);
       },
     );
   };
 
-  func test(p : [var Nat], responses : [ChunkResponse]) : async Bool {
-    let s = Sender(n);
+  func test(p : [var Nat], responses : [(ChunkResponse, ChunkRequest)]) : async Bool {
+    let s = Sender(0);
     s.setMaxN(?(n + 1));
 
     let chunk = Array.tabulate<Chunk>(n, func(i) = Chunk());
     var result = Array.init<async ()>(n, async ());
 
     for (i in Iter.range(0, n - 1)) {
+      switch (responses[i].1) {
+        case (#chunk) {
+          s.push(1);
+        };
+        case (#ping) {
+          s.setTime((i + 1) * 2);
+        };
+      };
       result[i] := s.send(chunk[i]);
+      await async {};
     };
-    await async {};
 
     for (i in Iter.range(0, n - 1)) {
-      chunk[p[i]].release(responses[p[i]]);
+      chunk[p[i]].release(responses[p[i]].0);
       await result[p[i]];
     };
-    s.status() == #ready;
+    s.status() != #shutdown;
   };
 
   let p = Array.tabulateVar<Nat>(n, func(i) = i);
   label l loop {
     for (i in Iter.range(0, 2 ** n - 1)) {
       for (j in Iter.range(0, 2 ** n - 1)) {
-        let a = Nat32.fromNat(i);
-        let b = Nat32.fromNat(j);
-        if (Nat32.bitor(a, b) == a) {
-          let r = getResponses(a, b);
+        for (time in Iter.range(0, n - 1)) {
+          let a = Nat32.fromNat(i);
+          let b = Nat32.fromNat(j);
+          let r = getResponses(a, b, time);
           if (not (await test(p, r))) {
-            Debug.print(debug_show (p, i, j, r));
+            Debug.print(debug_show (p, i, j, time, r));
             assert false;
           };
         };
