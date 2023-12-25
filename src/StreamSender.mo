@@ -42,13 +42,13 @@ module {
 
   /// Stream sender receiving items of type `T` with `push` function and sending them with `sendFunc` callback when calling `sendChunk`.
   ///
-  /// Arguments:
+  /// Arguments:  
   /// * `sendFunc` typically should implement sending chunk to the receiver canister.
   /// * `counterCreator` is used to create a chunk out of pushed items.
   /// `accept` function is called sequentially on items which are added to the chunk, until receiving `null`.
   /// If the item is accepted it should be converted to type `S`.
   /// Typical implementation of `counter` is to accept items while their total size is less then given maximum chunk size.
-  /// * `settings` consists of:
+  /// * `settings` consists of:  
   ///   * `maxQueueSize` is maximum number of elements, which can simultaneously be in `StreamSender`'s queue. Default value is infinity.
   ///   * `maxConcurrentChunks` is maximum number of concurrent `sendChunk` calls. Default value is `MAX_CONCURRENT_CHUNKS_DEFAULT`.
   ///   * `keepAlive` is pair of period in seconds after which `StreamSender` should send ping chunk in case if there is no items to send and current time function.
@@ -263,7 +263,26 @@ module {
       return res == #ok;
     };
 
-    /// Total amount of items, ever added to the stream sender, also an index, which will be assigned to the next item
+    /// Update max queue size.
+    public func setMaxQueueSize(value : ?Nat) {
+      settings_.maxQueueSize := value;
+    };
+
+    /// Update max amount of concurrent outgoing requests.
+    public func setMaxConcurrentChunks(value : ?Nat) {
+      settings_.maxConcurrentChunks := value;
+    };
+
+    /// Update max interval between stream calls.
+    public func setKeepAlive(seconds : ?(Nat, () -> Int)) {
+      settings_.keepAlive := seconds;
+    };
+
+    // Query functions for internal state
+    // Should not be needed by normal users of the class
+
+    /// Total amount of items, ever added to the stream sender.
+    /// Equals the index which will be assigned to the next item.
     public func length() : Nat = buffer.end();
 
     /// Amount of items, which were sent to receiver.
@@ -293,19 +312,5 @@ module {
     /// Check paused status of sender.
     public func isPaused() : Bool = paused;
 
-    /// Update max queue size.
-    public func setMaxQueueSize(value : ?Nat) {
-      settings_.maxQueueSize := value;
-    };
-
-    /// Update max amount of concurrent outgoing requests.
-    public func setMaxConcurrentChunks(value : ?Nat) {
-      settings_.maxConcurrentChunks := value;
-    };
-
-    /// Update max interval between stream calls.
-    public func setKeepAlive(seconds : ?(Nat, () -> Int)) {
-      settings_.keepAlive := seconds;
-    };
   };
 };
