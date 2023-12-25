@@ -87,7 +87,7 @@ class Sender(n : Nat) {
     time := t;
   };
 
-  public func setMaxN(n : ?Nat) {
+  public func setMaxN(n : Nat) {
     sender.setMaxConcurrentChunks(n);
   };
 
@@ -186,7 +186,7 @@ func allCases(n : Nat) : async () {
 
   func test(p : [var Nat], responses : [(ChunkResponse, ChunkRequest)], len : Nat) : async Bool {
     let s = Sender(0);
-    s.setMaxN(?(n + 1));
+    s.setMaxN(n + 1);
 
     let chunk = Array.tabulate<Chunk>(n, func(i) = Chunk());
     var result = Array.init<async ()>(n, async ());
@@ -267,7 +267,7 @@ do {
   let s = Sender(n);
   let r = StreamReceiver.StreamReceiver<()>(0, null, func(pos : Nat, item : ()) = ());
 
-  s.setMaxN(?(n + 1));
+  s.setMaxN(n + 1);
   let chunk = Array.tabulate<Chunk>(n, func(i) = Chunk());
   var result = Array.init<async ()>(n, async ());
 
