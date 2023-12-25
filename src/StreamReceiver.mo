@@ -12,12 +12,12 @@ module {
   /// Stream length, last chunk received timestamp, stopped flag.
   public type StableData = (Nat, Int, Bool);
 
-  /// StreamReceiver  
+  /// StreamReceiver
   /// * receives chunk by `onChunk` call
   /// * validates `start` position in ChunkMessage (must match internal `length` variable)
   /// * calls `itemCallback` for each item of the chunk.
   ///
-  /// Constructor arguments:  
+  /// Constructor arguments:
   /// * `startPos` is starting length
   /// * `timeout` is maximum waiting time between onChunk calls (default = infinite)
   /// * `itemCallback` function
@@ -44,7 +44,11 @@ module {
     };
 
     /// Share data in order to store in stable varible. No validation is performed.
-    public func share() : StableData = (length_, lastChunkReceived_, stopped_);
+    public func share() : StableData = (
+      length_,
+      lastChunkReceived_,
+      stopped_,
+    );
 
     /// Unhare data in order to store in stable varible. No validation is performed.
     public func unshare(data : StableData) {
