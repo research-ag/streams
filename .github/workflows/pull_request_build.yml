@@ -18,7 +18,6 @@ jobs:
       - name: Make bin directory
         run: mkdir -p /home/runner/bin
 
-
       - name: "install Motoko binaries"
         run: |
           wget https://github.com/dfinity/motoko/releases/download/${{ env.moc_version }}/motoko-Linux-x86_64-${{ env.moc_version }}.tar.gz
@@ -39,3 +38,12 @@ jobs:
   
       - name: Run test
         run: DFX_MOC_PATH=/home/runner/bin/moc mops test
+
+      - name: Get dfx
+        run: |
+          DFX_VERSION=${{ env.dfx_version }} sh -ci "$(curl -fsSL https://internetcomputer.org/install.sh)"
+
+      - name: Build examples
+        working-directory: ./examples
+        run: |
+          for dir in *; do (cd "$dir" && DFX_MOC_PATH=/home/runner/bin/moc dfx build --check); done
