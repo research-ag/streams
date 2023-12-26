@@ -28,7 +28,7 @@ module {
     var length_ = 0;
     var lastChunkReceived_ : Int = 0;
 
-    func checkTime() {
+    func checkTimeAndStop() {
       let ?arg = timeoutArg else return;
       let now = arg.1 ();
       if ((now - lastChunkReceived_) <= arg.0) {
@@ -64,7 +64,7 @@ module {
       if (start != length_) return #gap;
       switch (msg) {
         case (#ping or #chunk _) {
-          checkTime();
+          checkTimeAndStop();
           if (stopped_) return #stop;
         };
         case (#restart) {
