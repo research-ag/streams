@@ -41,14 +41,16 @@ module {
       lastChunkReceived_ := arg.1 ();
     };
 
-    /// Share data in order to store in stable varible. No validation is performed.
+    resetTimeout();
+
+    /// Share data in order to store in stable variable. No validation is performed.
     public func share() : StableData = (
       length_,
       lastChunkReceived_,
       stopped_,
     );
 
-    /// Unhare data in order to store in stable varible. No validation is performed.
+    /// Unhare data in order to store in stable variable. No validation is performed.
     public func unshare(data : StableData) {
       length_ := data.0;
       lastChunkReceived_ := data.1;
