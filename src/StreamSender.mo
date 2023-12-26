@@ -33,10 +33,8 @@ module {
   public type StableData<T> = {
     buffer : SWB.StableData<T>;
     stopped : Bool;
-    paused : Bool;
     head : Nat;
     lastChunkSent : Int;
-    concurrentChunks : Nat;
     shutdown : Bool;
   };
 
@@ -89,21 +87,17 @@ module {
     public func share() : StableData<T> = {
       buffer = buffer.share();
       stopped = stopped;
-      paused = paused;
       head = head;
       lastChunkSent = lastChunkSent;
-      concurrentChunks = concurrentChunks;
-      shutdown = shutdown;
+      shutdown = shutdown or paused or concurrentChunks > 0;
     };
 
     /// Unhare data in order to store in stable varible. No validation is performed.
     public func unshare(data : StableData<T>) {
       buffer.unshare(data.buffer);
       stopped := data.stopped;
-      paused := data.paused;
       head := data.head;
       lastChunkSent := data.lastChunkSent;
-      concurrentChunks := data.concurrentChunks;
       shutdown := data.shutdown;
     };
 
