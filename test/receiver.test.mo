@@ -9,7 +9,7 @@ do {
     size += 1;
   };
 
-  let receiver = StreamReceiver.StreamReceiver<Text>(null, process);
+  let receiver = StreamReceiver.StreamReceiver<Text>(process, null);
 
   assert receiver.onChunk((0, #chunk(["abc"]))) == #ok;
   assert receiver.onChunk((0, #chunk(["abc"]))) == #gap;
@@ -33,7 +33,7 @@ do {
 
   var time = 0;
 
-  let receiver = StreamReceiver.StreamReceiver<Text>(?(1, func() = time), process);
+  let receiver = StreamReceiver.StreamReceiver<Text>(process, ?(1, func() = time));
   assert receiver.onChunk((0, #chunk(["abc"]))) == #ok;
   assert receiver.lastChunkReceived() == 0;
 

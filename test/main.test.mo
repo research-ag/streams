@@ -18,11 +18,11 @@ func createReceiver() : Receiver<?Text> {
   let received = Buffer.Buffer<?Text>(0);
 
   let receiver = Receiver<?Text>(
-    null,
     func(pos : Nat, item : ?Text) {
       assert pos == received.size();
       received.add(item);
     },
+    null,
   );
   receiver;
 };

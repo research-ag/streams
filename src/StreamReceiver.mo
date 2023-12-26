@@ -18,12 +18,11 @@ module {
   /// * calls `itemCallback` for each item of the chunk.
   ///
   /// Constructor arguments:
-  /// * `startPos` is starting length
-  /// * `timeout` is maximum waiting time between onChunk calls (default = infinite)
   /// * `itemCallback` function
+  /// * `timeout` is maximum waiting time between onChunk calls (default = infinite)
   public class StreamReceiver<T>(
-    timeoutArg : ?(Nat, () -> Int),
     itemCallback : (pos : Nat, item : T) -> (),
+    timeoutArg : ?(Nat, () -> Int),
   ) {
     var stopped_ = false;
     var length_ = 0;
