@@ -48,8 +48,8 @@ func createSender(receiver : Receiver<?Text>) : Sender<Text, ?Text> {
   func send(ch : ChunkMessage) : async* ControlMessage { receiver.onChunk(ch) };
 
   let sender = Sender<Text, ?Text>(
-    counter,
     send,
+    counter,
     null,
   );
   sender;

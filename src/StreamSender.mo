@@ -52,8 +52,8 @@ module {
   ///   * `keepAlive` is pair of period in seconds after which `StreamSender` should send ping chunk in case if there is no items to send and current time function.
   ///     Default value means not to ping.
   public class StreamSender<T, S>(
-    counterCreator : () -> { accept(item : T) : ?S },
     sendFunc : (x : Types.ChunkMessage<S>) -> async* Types.ControlMessage,
+    counterCreator : () -> { accept(item : T) : ?S },
     settings : ?Settings,
   ) {
     let buffer = SWB.SlidingWindowBuffer<T>();

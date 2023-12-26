@@ -53,8 +53,8 @@ class Sender(n : Nat) {
   };
 
   let sender = StreamSender.StreamSender<Text, ?Text>(
-    Base.create(1),
     sendChunkMessage,
+    Base.create(1),
     ?{
       keepAlive = ?(1, func() = time);
       maxQueueSize = null;

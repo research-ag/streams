@@ -154,8 +154,8 @@ actor A {
   };
 
   let sender = StreamSender.StreamSender<Text, ?Text>(
-    counter,
     sendToReceiver,
+    counter,
     null,
   );
 

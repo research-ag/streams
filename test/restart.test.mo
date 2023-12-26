@@ -34,8 +34,8 @@ func createSender(receiver : Receiver<?Text>) : Sender<Text, ?Text> {
   func send(ch : ChunkMessage) : async* ControlMessage { receiver.onChunk(ch) };
 
   let sender = Sender<Text, ?Text>(
-    Base.create(1),
     send,
+    Base.create(1),
     null,
   );
   sender;
