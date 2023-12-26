@@ -23,7 +23,7 @@ module {
   public let MAX_CONCURRENT_CHUNKS_DEFAULT = 5;
 
   /// Settings of `StreamSender`.
-  public type Settings = {
+  public type SettingsArg = {
     maxQueueSize : ?Nat;
     maxConcurrentChunks : ?Nat;
     keepAlive : ?(Nat, () -> Int);
@@ -56,19 +56,18 @@ module {
   public class StreamSender<Q, S>(
     counterCreator : () -> { accept(item : Q) : ?S },
     sendFunc : (x : Types.ChunkMessage<S>) -> async* Types.ControlMessage,
-    settings : ?Settings,
+    settings : ?SettingsArg,
   ) {
     let buffer = SWB.SlidingWindowBuffer<Q>();
 
     let settings_ = {
-      var maxQueueSize = Option.chain<Settings, Nat>(settings, func(s) = s.maxQueueSize);
-      var keepAlive = Option.chain<Settings, (Nat, () -> Int)> (settings, func(s) = s.keepAlive);
+      var maxQueueSize = Option.chain<SettingsArg, Nat>(settings, func(s) = s.maxQueueSize);
+      var keepAlive = Option.chain<SettingsArg, (Nat, () -> Int)> (settings, func(s) = s.keepAlive);
+      var maxConcurrentChunks : Nat = Option.get(
+        Option.chain<SettingsArg, Nat>(settings, func(s) = s.maxConcurrentChunks),
+        MAX_CONCURRENT_CHUNKS_DEFAULT,
+      );
     };
-
-    var maxConcurrentChunks : Nat = Option.get(
-      Option.chain<Settings, Nat>(settings, func(s) = s.maxQueueSize),
-      MAX_CONCURRENT_CHUNKS_DEFAULT,
-    );
 
     var stopped = false;
     var paused = false;
@@ -106,15 +105,15 @@ module {
       shutdown := data.shutdown;
     };
 
-    func isQueueFull() : Bool {
-      let ?max = settings_.maxQueueSize else return false;
-      buffer.len() >= max;
+    func queueFull() : Bool {
+      let ?maxQueueSize = settings_.maxQueueSize else return false;
+      buffer.len() >= maxQueueSize;
     };
 
     /// Add item to the `StreamSender`'s queue. Return number of succesfull `push` call, or error in case of lack of space.
     public func push(item : Q) : Result.Result<Nat, { #NoSpace }> {
-      if (isQueueFull()) #err(#NoSpace) else
-      #ok(buffer.add item);
+      if (queueFull()) return #err(#NoSpace);
+      return #ok(buffer.add item);
     };
 
     /// Get the stream sender's status for inspection.
@@ -146,7 +145,7 @@ module {
       if (shutdown) return #shutdown;
       if (stopped) return #stopped;
       if (paused) return #paused;
-      if (concurrentChunks == maxConcurrentChunks) return #busy;
+      if (concurrentChunks == settings_.maxConcurrentChunks) return #busy;
       return #ready;
     };
 
@@ -263,14 +262,10 @@ module {
     };
 
     /// Update max queue size.
-    public func setMaxQueueSize(value : ?Nat) {
-      settings_.maxQueueSize := value;
-    };
+    public func setMaxQueueSize(n : ?Nat) = settings_.maxQueueSize := n;
 
     /// Update max amount of concurrent outgoing requests.
-    public func setMaxConcurrentChunks(value : Nat) {
-      maxConcurrentChunks := value;
-    };
+    public func setMaxConcurrentChunks(n : Nat) = settings_.maxConcurrentChunks := n;
 
     /// Update max interval between stream calls.
     public func setKeepAlive(seconds : ?(Nat, () -> Int)) {
@@ -303,7 +298,7 @@ module {
     public func isStopped() : Bool = stopped;
 
     /// Check busy status of sender.
-    public func isBusy() : Bool = concurrentChunks == maxConcurrentChunks;
+    public func isBusy() : Bool = concurrentChunks == settings_.maxConcurrentChunks;
 
     /// Check busy level of sender, e.g. current amount of outgoing calls in flight.
     public func busyLevel() : Nat = concurrentChunks;
