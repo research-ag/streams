@@ -18,7 +18,7 @@ func createReceiver() : Receiver<?Text> {
   let received = Buffer.Buffer<?Text>(0);
 
   let receiver = Receiver<?Text>(
-    0,
+    StreamReceiver.new(),
     null,
     func(pos : Nat, item : ?Text) {
       assert pos == received.size();
