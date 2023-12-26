@@ -152,7 +152,7 @@ module {
       if (shutdown) throw Error.reject("Sender shut down");
       if (stopped) throw Error.reject("Stream stopped by receiver");
       if (paused) throw Error.reject("Stream is paused");
-      if (isBusy()) throw Error.reject("Stream is busy");
+      if (concurrentChunks == settings_.maxConcurrentChunks) throw Error.reject("Stream is busy");
 
       let start = head;
       let elements = do {
