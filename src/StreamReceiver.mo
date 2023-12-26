@@ -8,9 +8,20 @@ module {
   /// Argument of processing function.
   public type ChunkMessage<T> = Types.ChunkMessage<T>;
 
-  /// Type of `StableData` for `share`/`unshare` function.
-  /// Stream length, last chunk received timestamp, stopped flag.
-  public type StableData = (Nat, Int, Bool);
+  /// Stable type of the receiver's memory.
+  /// This can be declared with `stable let` and passed to the StreamReceiver constructor.
+  public type ReceiverMem = {
+    var length : Nat;
+    var lastChunkReceived : Int;
+    var stopped : Bool;
+  };
+
+  /// Creates a new, initialised receiver's memory.
+  public func new() : ReceiverMem = {
+    var length = 0;
+    var lastChunkReceived = 0;
+    var stopped = false;
+  };
 
   /// StreamReceiver
   /// * receives chunk by `onChunk` call
@@ -22,39 +33,21 @@ module {
   /// * `timeout` is maximum waiting time between onChunk calls (default = infinite)
   /// * `itemCallback` function
   public class StreamReceiver<T>(
-    startPos : Nat,
+    mem : ReceiverMem,
     timeoutArg : ?(Nat, () -> Int),
     itemCallback : (pos : Nat, item : T) -> (),
   ) {
-    var stopped_ = false;
-    var length_ : Nat = startPos;
-    var lastChunkReceived_ : Int = 0;
-
     func checkTime() {
       let ?arg = timeoutArg else return;
       let now = arg.1 ();
-      if ((now - lastChunkReceived_) <= arg.0) {
-        lastChunkReceived_ := now;
+      if ((now - mem.lastChunkReceived) <= arg.0) {
+        mem.lastChunkReceived := now;
       } else stop();
     };
 
     func resetTimeout() {
       let ?arg = timeoutArg else return;
-      lastChunkReceived_ := arg.1 ();
-    };
-
-    /// Share data in order to store in stable varible. No validation is performed.
-    public func share() : StableData = (
-      length_,
-      lastChunkReceived_,
-      stopped_,
-    );
-
-    /// Unhare data in order to store in stable varible. No validation is performed.
-    public func unshare(data : StableData) {
-      length_ := data.0;
-      lastChunkReceived_ := data.1;
-      stopped_ := data.2;
+      mem.lastChunkReceived := arg.1 ();
     };
 
     /// Returns `#gap` if start position in ChunkMessage does not match internal length.
@@ -63,33 +56,33 @@ module {
     /// A #ping message is handled equivalently to a #chunk of length zero.
     public func onChunk(cm : Types.ChunkMessage<T>) : Types.ControlMessage {
       let (start, msg) = cm;
-      if (start != length_) return #gap;
+      if (start != mem.length) return #gap;
       switch (msg) {
         case (#ping or #chunk _) {
           checkTime();
-          if (stopped_) return #stop;
+          if (mem.stopped) return #stop;
         };
         case (#restart) {
           resetTimeout();
-          stopped_ := false;
+          mem.stopped := false;
         };
       };
       let #chunk ch = msg else return #ok;
       for (i in ch.keys()) itemCallback(start + i, ch[i]);
-      length_ += ch.size();
+      mem.length += ch.size();
       return #ok;
     };
 
     /// Manually stop the receiver.
-    public func stop() = stopped_ := true;
+    public func stop() = mem.stopped := true;
 
     /// Current number of received items.
-    public func length() : Nat = length_;
+    public func length() : Nat = mem.length;
 
     /// Timestamp when stream received last chunk
-    public func lastChunkReceived() : Int = lastChunkReceived_;
+    public func lastChunkReceived() : Int = mem.lastChunkReceived;
 
     /// Flag if receiver is stopped (manually or by inactivity timeout)
-    public func isStopped() : Bool = stopped_;
+    public func isStopped() : Bool = mem.stopped;
   };
 };

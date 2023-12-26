@@ -29,7 +29,7 @@ actor B {
 
   // StreamReceiver
   let receiver = StreamReceiver.StreamReceiver<?Text>(
-    0,
+    StreamReceiver.new(),
     null,
     processItem,
   );
