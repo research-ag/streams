@@ -151,7 +151,6 @@ func allCases(n : Nat) : async () {
   func getResponses(a_ : Nat32, b_ : Nat32, c : Nat) : ([(ChunkResponse, ChunkRequest)], Nat) {
     var time : Int = 0;
     let r = StreamReceiver.StreamReceiver<()>(
-      0,
       ?(1, func() = time),
       func(pos : Nat, item : ()) = (),
     );
@@ -265,7 +264,7 @@ do {
   let n = 100;
   let p = random_permutation(n);
   let s = Sender(n);
-  let r = StreamReceiver.StreamReceiver<()>(0, null, func(pos : Nat, item : ()) = ());
+  let r = StreamReceiver.StreamReceiver<()>(null, func(pos : Nat, item : ()) = ());
 
   s.setMaxN(?(n + 1));
   let chunk = Array.tabulate<Chunk>(n, func(i) = Chunk());

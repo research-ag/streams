@@ -22,12 +22,11 @@ module {
   /// * `timeout` is maximum waiting time between onChunk calls (default = infinite)
   /// * `itemCallback` function
   public class StreamReceiver<T>(
-    startPos : Nat,
     timeoutArg : ?(Nat, () -> Int),
     itemCallback : (pos : Nat, item : T) -> (),
   ) {
     var stopped_ = false;
-    var length_ : Nat = startPos;
+    var length_ = 0;
     var lastChunkReceived_ : Int = 0;
 
     func checkTime() {
