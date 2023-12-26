@@ -8,8 +8,9 @@ actor Receiver {
 
   let received = Buffer.Buffer<?Text>(0);
 
+  stable let mem = Stream.new();
   let receiver = Stream.StreamReceiver<?Text>(
-    0,
+    mem,
     null,
     func(index : Nat, item : ?Text) {
       assert received.size() == index;

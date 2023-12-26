@@ -13,7 +13,8 @@ actor class Main(sender : Principal) {
   };
 
   // begin boilerplate
-  let receiver_ = Stream.StreamReceiver<Item>(0, null, processItem); // substitute your processing function for `processItem` 
+  stable let mem_ = Stream.new();
+  let receiver_ = Stream.StreamReceiver<Item>(mem_, null, processItem); // substitute your processing function for `processItem` 
   public shared (msg) func receive(m : Stream.ChunkMessage<Item>) : async Stream.ControlMessage {
     // choose a name for public endpoint `receive`
     if (msg.caller != sender) throw Error.reject("not authorized"); // use the init argument `sender` here
