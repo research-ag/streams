@@ -47,4 +47,4 @@ jobs:
       - name: Build examples
         working-directory: ./examples
         run: |
-          for dir in *; do (cd "$dir" && DFX_MOC_PATH=/home/runner/bin/moc dfx build --check); done
+          for dir in *; do (if [ -d "$dir" ]; then (cd "$dir" && DFX_MOC_PATH=/home/runner/bin/moc dfx build --check) fi); done
