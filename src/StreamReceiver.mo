@@ -90,6 +90,9 @@ module {
     public func lastChunkReceived() : Int = lastChunkReceived_;
 
     /// Flag if receiver is stopped (manually or by inactivity timeout)
-    public func isStopped() : Bool = stopped_;
+    public func isStopped() : Bool {
+      checkTimeAndStop();
+      stopped_;
+    };
   };
 };
