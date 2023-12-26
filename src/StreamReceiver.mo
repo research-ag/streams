@@ -37,7 +37,7 @@ module {
     timeoutArg : ?(Nat, () -> Int),
     itemCallback : (pos : Nat, item : T) -> (),
   ) {
-    func checkTime() {
+    func checkTimeAndStop() {
       let ?arg = timeoutArg else return;
       let now = arg.1 ();
       if ((now - mem.lastChunkReceived) <= arg.0) {
@@ -59,7 +59,7 @@ module {
       if (start != mem.length) return #gap;
       switch (msg) {
         case (#ping or #chunk _) {
-          checkTime();
+          checkTimeAndStop();
           if (mem.stopped) return #stop;
         };
         case (#restart) {
