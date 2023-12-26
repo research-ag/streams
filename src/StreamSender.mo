@@ -76,8 +76,6 @@ module {
       lastChunkSent := arg.1 ();
     };
 
-    updateTime();
-
     /// Share data in order to store in stable varible. No validation is performed.
     public func share() : StableData<Q> = {
       buffer = buffer.share();
