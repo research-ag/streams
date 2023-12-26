@@ -28,7 +28,7 @@ module {
     var length_ = 0;
     var lastChunkReceived_ : Int = 0;
 
-    func checkTime() {
+    func checkTimeAndStop() {
       let ?arg = timeoutArg else return;
       let now = arg.1 ();
       if ((now - lastChunkReceived_) <= arg.0) {
@@ -41,14 +41,16 @@ module {
       lastChunkReceived_ := arg.1 ();
     };
 
-    /// Share data in order to store in stable varible. No validation is performed.
+    resetTimeout();
+
+    /// Share data in order to store in stable variable. No validation is performed.
     public func share() : StableData = (
       length_,
       lastChunkReceived_,
       stopped_,
     );
 
-    /// Unhare data in order to store in stable varible. No validation is performed.
+    /// Unhare data in order to store in stable variable. No validation is performed.
     public func unshare(data : StableData) {
       length_ := data.0;
       lastChunkReceived_ := data.1;
@@ -64,7 +66,7 @@ module {
       if (start != length_) return #gap;
       switch (msg) {
         case (#ping or #chunk _) {
-          checkTime();
+          checkTimeAndStop();
           if (stopped_) return #stop;
         };
         case (#restart) {
@@ -88,6 +90,9 @@ module {
     public func lastChunkReceived() : Int = lastChunkReceived_;
 
     /// Flag if receiver is stopped (manually or by inactivity timeout)
-    public func isStopped() : Bool = stopped_;
+    public func isStopped() : Bool {
+      checkTimeAndStop();
+      stopped_;
+    };
   };
 };

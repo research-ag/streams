@@ -1,9 +1,6 @@
 import Error "mo:base/Error";
-import R "mo:base/Result";
-import Time "mo:base/Time";
-import Array "mo:base/Array";
-import Option "mo:base/Option";
 import Nat "mo:base/Nat";
+import Option "mo:base/Option";
 import Result "mo:base/Result";
 import SWB "mo:swb";
 import Vector "mo:vector";
@@ -23,7 +20,7 @@ module {
   public let MAX_CONCURRENT_CHUNKS_DEFAULT = 5;
 
   /// Settings of `StreamSender`.
-  public type Settings = {
+  public type SettingsArg = {
     maxQueueSize : ?Nat;
     maxConcurrentChunks : ?Nat;
     keepAlive : ?(Nat, () -> Int);
@@ -38,36 +35,34 @@ module {
     shutdown : Bool;
   };
 
-  /// Stream sender receiving items of type `T` with `push` function and sending them with `sendFunc` callback when calling `sendChunk`.
+  /// Stream sender receiving items of type `Q` with `push` function and sending them with `sendFunc` callback when calling `sendChunk`.
   ///
-  /// Arguments:  
+  /// Arguments:
   /// * `sendFunc` typically should implement sending chunk to the receiver canister.
   /// * `counterCreator` is used to create a chunk out of pushed items.
   /// `accept` function is called sequentially on items which are added to the chunk, until receiving `null`.
   /// If the item is accepted it should be converted to type `S`.
   /// Typical implementation of `counter` is to accept items while their total size is less then given maximum chunk size.
-  /// * `settings` consists of:  
+  /// * `settings` consists of:
   ///   * `maxQueueSize` is maximum number of elements, which can simultaneously be in `StreamSender`'s queue. Default value is infinity.
   ///   * `maxConcurrentChunks` is maximum number of concurrent `sendChunk` calls. Default value is `MAX_CONCURRENT_CHUNKS_DEFAULT`.
   ///   * `keepAlive` is pair of period in seconds after which `StreamSender` should send ping chunk in case if there is no items to send and current time function.
   ///     Default value means not to ping.
-  public class StreamSender<T, S>(
+  public class StreamSender<Q, S>(
     sendFunc : (x : Types.ChunkMessage<S>) -> async* Types.ControlMessage,
-    counterCreator : () -> { accept(item : T) : ?S },
-    settings : ?Settings,
+    counterCreator : () -> { accept(item : Q) : ?S },
+    settings : ?SettingsArg,
   ) {
-    let buffer = SWB.SlidingWindowBuffer<T>();
+    let buffer = SWB.SlidingWindowBuffer<Q>();
 
-    var settings_ = {
-      var maxQueueSize = Option.chain(settings, func(s : Settings) : ?Nat = s.maxQueueSize);
-      var maxConcurrentChunks = Option.chain(settings, func(s : Settings) : ?Nat = s.maxConcurrentChunks);
-      var keepAlive = Option.chain(settings, func(s : Settings) : ?(Nat, () -> Int) = s.keepAlive);
+    let settings_ = {
+      var maxQueueSize = Option.chain<SettingsArg, Nat>(settings, func(s) = s.maxQueueSize);
+      var keepAlive = Option.chain<SettingsArg, (Nat, () -> Int)> (settings, func(s) = s.keepAlive);
+      var maxConcurrentChunks : Nat = Option.get(
+        Option.chain<SettingsArg, Nat>(settings, func(s) = s.maxConcurrentChunks),
+        MAX_CONCURRENT_CHUNKS_DEFAULT,
+      );
     };
-
-    func maxConcurrentChunks() : Nat = Option.get(
-      settings_.maxConcurrentChunks,
-      MAX_CONCURRENT_CHUNKS_DEFAULT,
-    );
 
     var stopped = false;
     var paused = false;
@@ -81,10 +76,8 @@ module {
       lastChunkSent := arg.1 ();
     };
 
-    updateTime();
-
     /// Share data in order to store in stable varible. No validation is performed.
-    public func share() : StableData<T> = {
+    public func share() : StableData<Q> = {
       buffer = buffer.share();
       stopped = stopped;
       head = head;
@@ -93,7 +86,7 @@ module {
     };
 
     /// Unhare data in order to store in stable varible. No validation is performed.
-    public func unshare(data : StableData<T>) {
+    public func unshare(data : StableData<Q>) {
       buffer.unshare(data.buffer);
       stopped := data.stopped;
       head := data.head;
@@ -101,15 +94,15 @@ module {
       shutdown := data.shutdown;
     };
 
-    func isQueueFull() : Bool {
-      let ?max = settings_.maxQueueSize else return false;
-      buffer.len() >= max;
+    func queueFull() : Bool {
+      let ?maxQueueSize = settings_.maxQueueSize else return false;
+      buffer.len() >= maxQueueSize;
     };
 
     /// Add item to the `StreamSender`'s queue. Return number of succesfull `push` call, or error in case of lack of space.
-    public func push(item : T) : Result.Result<Nat, { #NoSpace }> {
-      if (isQueueFull()) #err(#NoSpace) else
-      #ok(buffer.add item);
+    public func push(item : Q) : Result.Result<Nat, { #NoSpace }> {
+      if (queueFull()) return #err(#NoSpace);
+      return #ok(buffer.add item);
     };
 
     /// Get the stream sender's status for inspection.
@@ -141,7 +134,7 @@ module {
       if (shutdown) return #shutdown;
       if (stopped) return #stopped;
       if (paused) return #paused;
-      if (concurrentChunks == maxConcurrentChunks()) return #busy;
+      if (concurrentChunks == settings_.maxConcurrentChunks) return #busy;
       return #ready;
     };
 
@@ -157,7 +150,7 @@ module {
       if (shutdown) throw Error.reject("Sender shut down");
       if (stopped) throw Error.reject("Stream stopped by receiver");
       if (paused) throw Error.reject("Stream is paused");
-      if (isBusy()) throw Error.reject("Stream is busy");
+      if (concurrentChunks == settings_.maxConcurrentChunks) throw Error.reject("Stream is busy");
 
       let start = head;
       let elements = do {
@@ -258,14 +251,10 @@ module {
     };
 
     /// Update max queue size.
-    public func setMaxQueueSize(value : ?Nat) {
-      settings_.maxQueueSize := value;
-    };
+    public func setMaxQueueSize(n : ?Nat) = settings_.maxQueueSize := n;
 
     /// Update max amount of concurrent outgoing requests.
-    public func setMaxConcurrentChunks(value : ?Nat) {
-      settings_.maxConcurrentChunks := value;
-    };
+    public func setMaxConcurrentChunks(n : Nat) = settings_.maxConcurrentChunks := n;
 
     /// Update max interval between stream calls.
     public func setKeepAlive(seconds : ?(Nat, () -> Int)) {
@@ -286,7 +275,7 @@ module {
     public func received() : Nat = buffer.start();
 
     /// Get item from queue by index.
-    public func get(index : Nat) : ?T = buffer.getOpt(index);
+    public func get(index : Nat) : ?Q = buffer.getOpt(index);
 
     /// Returns flag is sender is ready.
     public func isReady() : Bool = status() == #ready;
@@ -298,7 +287,7 @@ module {
     public func isStopped() : Bool = stopped;
 
     /// Check busy status of sender.
-    public func isBusy() : Bool = concurrentChunks == maxConcurrentChunks();
+    public func isBusy() : Bool = concurrentChunks == settings_.maxConcurrentChunks;
 
     /// Check busy level of sender, e.g. current amount of outgoing calls in flight.
     public func busyLevel() : Nat = concurrentChunks;
