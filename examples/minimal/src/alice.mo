@@ -24,7 +24,7 @@ actor class Main(receiver : Principal) {
       return ?item;
     };
   };
-  let sender = Stream.StreamSender<Item, Item>(counter_, send_, null);
+  let sender = Stream.StreamSender<Item, Item>(send_, counter_, null);
 
   // example use of sender `push` and `sendChunk`
   public shared func enqueue(n : Nat) : async () {

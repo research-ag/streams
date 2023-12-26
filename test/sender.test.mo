@@ -22,8 +22,8 @@ do {
   };
 
   let sender = StreamSender.StreamSender<Text, ?Text>(
-    Base.create(5),
     send,
+    Base.create(5),
     null,
   );
 
@@ -52,8 +52,8 @@ do {
   };
 
   let sender = StreamSender.StreamSender<Text, ?Text>(
-    Base.create(6),
     send,
+    Base.create(6),
     null,
   );
 
@@ -76,8 +76,8 @@ do {
   };
 
   let sender = StreamSender.StreamSender<Text, ?Text>(
-    Base.create(5),
     send,
+    Base.create(5),
     null,
   );
   Result.assertOk(sender.push("abc"));
@@ -92,8 +92,8 @@ do {
   };
 
   let sender = StreamSender.StreamSender<Text, ?Text>(
-    Base.create(5),
     send,
+    Base.create(5),
     null,
   );
   Result.assertOk(sender.push("abc"));

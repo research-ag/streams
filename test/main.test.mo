@@ -18,12 +18,11 @@ func createReceiver() : Receiver<?Text> {
   let received = Buffer.Buffer<?Text>(0);
 
   let receiver = Receiver<?Text>(
-    0,
-    null,
     func(pos : Nat, item : ?Text) {
       assert pos == received.size();
       received.add(item);
     },
+    null,
   );
   receiver;
 };
@@ -49,8 +48,8 @@ func createSender(receiver : Receiver<?Text>) : Sender<Text, ?Text> {
   func send(ch : ChunkMessage) : async* ControlMessage { receiver.onChunk(ch) };
 
   let sender = Sender<Text, ?Text>(
-    counter,
     send,
+    counter,
     null,
   );
   sender;

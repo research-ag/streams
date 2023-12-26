@@ -1,9 +1,6 @@
 import Error "mo:base/Error";
-import R "mo:base/Result";
-import Time "mo:base/Time";
-import Array "mo:base/Array";
-import Option "mo:base/Option";
 import Nat "mo:base/Nat";
+import Option "mo:base/Option";
 import Result "mo:base/Result";
 import SWB "mo:swb";
 import Vector "mo:vector";
@@ -33,10 +30,8 @@ module {
   public type StableData<T> = {
     buffer : SWB.StableData<T>;
     stopped : Bool;
-    paused : Bool;
     head : Nat;
     lastChunkSent : Int;
-    concurrentChunks : Nat;
     shutdown : Bool;
   };
 
@@ -54,8 +49,8 @@ module {
   ///   * `keepAlive` is pair of period in seconds after which `StreamSender` should send ping chunk in case if there is no items to send and current time function.
   ///     Default value means not to ping.
   public class StreamSender<Q, S>(
-    counterCreator : () -> { accept(item : Q) : ?S },
     sendFunc : (x : Types.ChunkMessage<S>) -> async* Types.ControlMessage,
+    counterCreator : () -> { accept(item : Q) : ?S },
     settings : ?SettingsArg,
   ) {
     let buffer = SWB.SlidingWindowBuffer<Q>();
@@ -87,21 +82,17 @@ module {
     public func share() : StableData<Q> = {
       buffer = buffer.share();
       stopped = stopped;
-      paused = paused;
       head = head;
       lastChunkSent = lastChunkSent;
-      concurrentChunks = concurrentChunks;
-      shutdown = shutdown;
+      shutdown = shutdown or paused or concurrentChunks > 0;
     };
 
     /// Unhare data in order to store in stable varible. No validation is performed.
     public func unshare(data : StableData<Q>) {
       buffer.unshare(data.buffer);
       stopped := data.stopped;
-      paused := data.paused;
       head := data.head;
       lastChunkSent := data.lastChunkSent;
-      concurrentChunks := data.concurrentChunks;
       shutdown := data.shutdown;
     };
 

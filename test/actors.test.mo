@@ -29,9 +29,8 @@ actor B {
 
   // StreamReceiver
   let receiver = StreamReceiver.StreamReceiver<?Text>(
-    0,
-    null,
     processItem,
+    null,
   );
 
   // required top-level boilerplate code,
@@ -155,8 +154,8 @@ actor A {
   };
 
   let sender = StreamSender.StreamSender<Text, ?Text>(
-    counter,
     sendToReceiver,
+    counter,
     null,
   );
 

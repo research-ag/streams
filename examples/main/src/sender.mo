@@ -31,8 +31,8 @@ actor class Sender(receiverId : Principal) {
   };
 
   let sender = Stream.StreamSender<Text, ?Text>(
-    counter,
     send,
+    counter,
     null
   );
 

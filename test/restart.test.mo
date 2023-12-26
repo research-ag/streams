@@ -21,12 +21,11 @@ func createReceiver() : Receiver<?Text> {
   let received = Buffer.Buffer<?Text>(0);
 
   let receiver = Receiver<?Text>(
-    0,
-    null,
     func(pos : Nat, item : ?Text) {
       assert pos == received.size();
       received.add(item);
     },
+    null,
   );
   receiver;
 };
@@ -35,8 +34,8 @@ func createSender(receiver : Receiver<?Text>) : Sender<Text, ?Text> {
   func send(ch : ChunkMessage) : async* ControlMessage { receiver.onChunk(ch) };
 
   let sender = Sender<Text, ?Text>(
-    Base.create(1),
     send,
+    Base.create(1),
     null,
   );
   sender;
@@ -45,7 +44,7 @@ func createSender(receiver : Receiver<?Text>) : Sender<Text, ?Text> {
 let receiver = createReceiver();
 let sender = createSender(receiver);
 
-func send() : async() {
+func send() : async () {
   await* sender.sendChunk();
 };
 
@@ -73,4 +72,3 @@ await async {};
 
 await send();
 assert receiver.length() == n;
-

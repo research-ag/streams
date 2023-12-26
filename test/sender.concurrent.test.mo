@@ -53,8 +53,8 @@ class Sender(n : Nat) {
   };
 
   let sender = StreamSender.StreamSender<Text, ?Text>(
-    Base.create(1),
     sendChunkMessage,
+    Base.create(1),
     ?{
       keepAlive = ?(1, func() = time);
       maxQueueSize = null;
@@ -145,15 +145,14 @@ func allCases(n : Nat) : async () {
     };
     true;
   };
-  
+
   type ChunkRequest = { #chunk; #ping };
-  
+
   func getResponses(a_ : Nat32, b_ : Nat32, c : Nat) : ([(ChunkResponse, ChunkRequest)], Nat) {
     var time : Int = 0;
     let r = StreamReceiver.StreamReceiver<()>(
-      0,
-      ?(1, func() = time),
       func(pos : Nat, item : ()) = (),
+      ?(1, func() = time),
     );
     var x = 0;
     let re = Array.tabulate<(ChunkResponse, ChunkRequest)>(
@@ -265,7 +264,7 @@ do {
   let n = 100;
   let p = random_permutation(n);
   let s = Sender(n);
-  let r = StreamReceiver.StreamReceiver<()>(0, null, func(pos : Nat, item : ()) = ());
+  let r = StreamReceiver.StreamReceiver<()>(func(pos : Nat, item : ()) = (), null);
 
   s.setMaxN(n + 1);
   let chunk = Array.tabulate<Chunk>(n, func(i) = Chunk());
