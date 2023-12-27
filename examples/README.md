@@ -21,3 +21,7 @@ Compared to the example above this demonstrates:
 * how a more sophisticated counter for batch preparation can look like
 * how queue type can differ from sending type
 * how to send chunks from heartbeat
+
+## Promtracker
+
+Example to show using trackers along with strems.
