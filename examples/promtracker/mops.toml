@@ -1,5 +1,5 @@
 [dependencies]
 base = "0.10.3"
-swb = "1.1.0"
+swb = "1.1.1"
 vector = "0.2.0"
-promtracker = "https://github.com/research-ag/promtracker#main"
+promtracker = "0.3.0"
