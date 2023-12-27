@@ -4,17 +4,12 @@ import Result "mo:base/Result";
 import Debug "mo:base/Debug";
 import Array "mo:base/Array";
 import Text "mo:base/Text";
+import Time "mo:base/Time";
 import PT "mo:promtracker";
 import HTTP "http";
+import Tracker "tracker";
 
 actor class Sender(receiverId : Principal) = self {
-  let metrics = PT.PromTracker("", 65);
-  metrics.addSystemValues();
-
-  let chunkSizes = metrics.addGauge("chunk_sizes", "", #both, Array.tabulate<Nat>(5, func(i) = 2 ** i), false);
-  let messageSizes = metrics.addGauge("message_sizes", "", #both, Array.tabulate<Nat>(5, func(i) = 2 ** i), false);
-  let busyLevel = metrics.addGauge("busy_level", "", #both, Array.tabulate<Nat>(5, func(i) = 2 ** i), false);
-
   type ControlMessage = Stream.ControlMessage;
   type ChunkMessage = Stream.ChunkMessage<?Text>;
 
@@ -37,13 +32,13 @@ actor class Sender(receiverId : Principal) = self {
     };
   };
 
+  var tracker : ? Tracker.Sender = null;
+
   func send(message : ChunkMessage) : async* ControlMessage {
-    let size = switch (message.1) {
-      case (#chunk a) a.size();
-      case (_) 0;
-    };
-    chunkSizes.update(size);
-    await receiver.receive(message);
+    let ret = await receiver.receive(message);
+    let ?t = tracker else return ret;
+    t.onChunk(message, ret);
+    ret;
   };
 
   let sender = Stream.StreamSender<Text, ?Text>(
@@ -51,17 +46,22 @@ actor class Sender(receiverId : Principal) = self {
     counter,
     null,
   );
-  let sent = metrics.addPullValue("sent", "", func() = sender.sent());
-  let received = metrics.addPullValue("sent", "", func() = sender.received());
-  let length = metrics.addPullValue("sent", "", func() = sender.length());
+  
+  sender.setKeepAlive(?(10 ** 15, Time.now));
+
+  tracker := ?Tracker.Sender({ 
+    lastChunkReceived = sender.lastChunkSent;
+    length = sender.length;
+    sent = sender.sent;
+    received = sender.received;
+    busyLevel = sender.busyLevel;
+  });
 
   public shared func add(text : Text) : async () {
-    messageSizes.update(text.size());
     Result.assertOk(sender.push(text));
   };
 
   system func heartbeat() : async () {
-    busyLevel.update(sender.busyLevel());
     await* sender.sendChunk();
   };
 
@@ -69,8 +69,8 @@ actor class Sender(receiverId : Principal) = self {
   public query func http_request(req : HTTP.HttpRequest) : async HTTP.HttpResponse {
     let ?path = Text.split(req.url, #char '?').next() else return HTTP.render400();
     let labels = "canister=\"" # PT.shortName(self) # "\"";
-    switch (req.method, path) {
-      case ("GET", "/metrics") HTTP.renderPlainText(metrics.renderExposition(labels));
+    switch (req.method, path, tracker) {
+      case ("GET", "/metrics", ?t) HTTP.renderPlainText(t.metrics.renderExposition(labels));
       case (_) HTTP.render400();
     };
   };

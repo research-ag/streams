@@ -72,13 +72,13 @@ module {
     var stopped = false;
     var paused = false;
     var head : Nat = 0;
-    var lastChunkSent : Int = 0;
+    var lastChunkSent_ : Int = 0;
     var concurrentChunks = 0;
     var shutdown = false;
 
     func updateTime() {
       let ?arg = settings_.keepAlive else return;
-      lastChunkSent := arg.1 ();
+      lastChunkSent_ := arg.1 ();
     };
 
     updateTime();
@@ -88,7 +88,7 @@ module {
       buffer = buffer.share();
       stopped = stopped;
       head = head;
-      lastChunkSent = lastChunkSent;
+      lastChunkSent = lastChunkSent_;
       shutdown = shutdown or paused or concurrentChunks > 0;
     };
 
@@ -97,7 +97,7 @@ module {
       buffer.unshare(data.buffer);
       stopped := data.stopped;
       head := data.head;
-      lastChunkSent := data.lastChunkSent;
+      lastChunkSent_ := data.lastChunkSent;
       shutdown := data.shutdown;
     };
 
@@ -178,7 +178,7 @@ module {
 
       func shouldPing() : Bool {
         let ?arg = settings_.keepAlive else return false;
-        (arg.1 () - lastChunkSent) > arg.0;
+        (arg.1 () - lastChunkSent_) > arg.0;
       };
 
       if (size == 0 and not shouldPing()) return;
@@ -275,6 +275,9 @@ module {
     // Query functions for internal state
     // Should not be needed by normal users of the class
 
+    // Last chunk sent time
+    public func lastChunkSent() : Int = lastChunkSent_;
+    
     /// Total amount of items, ever added to the stream sender.
     /// Equals the index which will be assigned to the next item.
     public func length() : Nat = buffer.end();
@@ -305,6 +308,5 @@ module {
 
     /// Check paused status of sender.
     public func isPaused() : Bool = paused;
-
   };
 };
