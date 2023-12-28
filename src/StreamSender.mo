@@ -271,6 +271,9 @@ module {
     /// Equals the index which will be assigned to the next item.
     public func length() : Nat = buffer.end();
 
+    // Internal queue size
+    public func queueSize() : Nat = buffer.len();
+
     /// Amount of items, which were sent to receiver.
     public func sent() : Nat = head;
 
