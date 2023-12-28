@@ -25,16 +25,19 @@ module {
     let pingsOk = metrics.addCounter("total_pings_ok", "", true);
     let gaps = metrics.addCounter("total_gaps", "", true);
     let stops = metrics.addCounter("total_stops", "", true);
+    let errors = metrics.addCounter("total_errors", "", true);
     let restarts = metrics.addCounter("total_restarts", "", true);
     let lastStopPos = metrics.addCounter("last_stop_pos", "", true);
+    let lastErrorStopPos = metrics.addCounter("last_error_stop_pos", "", true);
     let lastRestartPos = metrics.addCounter("last_restart_pos", "", true);
+
     let timeSinceLastChunk = metrics.addGauge("time_since_last_chunk", "", #both, [], false);
 
     public func init(time : () -> Int) {
       time_ := time;
     };
 
-    public func onChunk(msg : Types.ChunkMessage<Any>, ret : Types.ControlMessage) {
+    public func onChunk(msg : Types.ChunkMessage<Any>, ret : Types.ControlMessage or { #error; }) {
       let pos = msg.0;
       switch (msg.1, ret) {
         case (#chunk c, #ok) {
@@ -53,6 +56,10 @@ module {
           stopFlag.update(1);
           lastStopPos.set(pos);
         };
+        case (_, #error) {
+          lastErrorStopPos.set(pos);
+          errors.add(1);
+        }
       };
       let t = time();
       if (ret != #gap and msg.1 != #restart and previousTime != 0) {

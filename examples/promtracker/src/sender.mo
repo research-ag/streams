@@ -36,9 +36,14 @@ actor class Sender(receiverId : Principal) = self {
   let tracker = Tracker.Sender(metrics);
 
   func send(message : ChunkMessage) : async* ControlMessage {
-    let ret = await receiver.receive(message);
-    tracker.onChunk(message, ret);
-    ret;
+    try {
+      let ret = await receiver.receive(message);
+      tracker.onChunk(message, ret);
+      return ret;
+    } catch (e) {
+      tracker.onChunk(message, #error);
+      throw e;
+    };
   };
 
   let sender = Stream.StreamSender<Text, ?Text>(
