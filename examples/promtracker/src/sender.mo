@@ -32,12 +32,12 @@ actor class Sender(receiverId : Principal) = self {
     };
   };
 
-  var tracker : ? Tracker.Sender = null;
+  let metrics = PT.PromTracker("", 65);
+  let tracker = Tracker.Sender(metrics);
 
   func send(message : ChunkMessage) : async* ControlMessage {
     let ret = await receiver.receive(message);
-    let ?t = tracker else return ret;
-    t.onChunk(message, ret);
+    tracker.onChunk(message, ret);
     ret;
   };
 
@@ -46,16 +46,10 @@ actor class Sender(receiverId : Principal) = self {
     counter,
     null,
   );
-  
+
   sender.setKeepAlive(?(10 ** 15, Time.now));
 
-  tracker := ?Tracker.Sender({ 
-    lastChunkReceived = sender.lastChunkSent;
-    length = sender.length;
-    sent = sender.sent;
-    received = sender.received;
-    busyLevel = sender.busyLevel;
-  });
+  tracker.init(sender);
 
   public shared func add(text : Text) : async () {
     Result.assertOk(sender.push(text));
@@ -69,8 +63,8 @@ actor class Sender(receiverId : Principal) = self {
   public query func http_request(req : HTTP.HttpRequest) : async HTTP.HttpResponse {
     let ?path = Text.split(req.url, #char '?').next() else return HTTP.render400();
     let labels = "canister=\"" # PT.shortName(self) # "\"";
-    switch (req.method, path, tracker) {
-      case ("GET", "/metrics", ?t) HTTP.renderPlainText(t.metrics.renderExposition(labels));
+    switch (req.method, path) {
+      case ("GET", "/metrics") HTTP.renderPlainText(tracker.metrics.renderExposition(labels));
       case (_) HTTP.render400();
     };
   };

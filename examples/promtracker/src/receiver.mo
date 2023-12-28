@@ -15,10 +15,10 @@ actor class Receiver() = self {
     ?(10 ** 15, Time.now),
   );
 
-  let tracker = Tracker.Receiver({ 
-    lastChunkReceived = receiver.lastChunkReceived;
-    length = receiver.length
-  });
+  let metrics = PT.PromTracker("", 65);
+
+  let tracker = Tracker.Receiver(metrics);
+  tracker.init(receiver);
 
   public shared func receive(message : ChunkMessage) : async ControlMessage {
     let ret = receiver.onChunk(message);
@@ -31,7 +31,7 @@ actor class Receiver() = self {
     let ?path = Text.split(req.url, #char '?').next() else return HTTP.render400();
     let labels = "canister=\"" # PT.shortName(self) # "\"";
     switch (req.method, path) {
-      case ("GET", "/metrics") HTTP.renderPlainText(tracker.metrics.renderExposition(labels));
+      case ("GET", "/metrics") HTTP.renderPlainText(metrics.renderExposition(labels));
       case (_) HTTP.render400();
     };
   };

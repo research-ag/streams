@@ -7,15 +7,16 @@ import Types "../../../src/types";
 module {
   public type ChunkMessage = (Nat, { #chunk : [Any]; #ping; #restart });
 
-  public class Chunk(metrics : PT.PromTrackerTestable, time_ : () -> Int) {
+  public class Chunk(metrics : PT.PromTrackerTestable) {
+    var time_ = func() : Int = (0 : Int);
     func time() : Nat = Int.abs(time_());
-    
+
     var previousTime : Nat = 0;
 
     // gauges
     let chunkSize = metrics.addGauge("chunk_size", "", #both, Array.tabulate<Nat>(8, func(i) = 8 ** i), false);
     let stopFlag = metrics.addGauge("stop_flag", "", #both, [], false);
-    
+
     // pulls
     ignore metrics.addPullValue("internal_last_chunk_received", "", time);
 
@@ -28,6 +29,10 @@ module {
     let lastStopPos = metrics.addCounter("last_stop_pos", "", true);
     let lastRestartPos = metrics.addCounter("last_restart_pos", "", true);
     let timeSinceLastChunk = metrics.addGauge("time_since_last_chunk", "", #both, [], false);
+
+    public func init(time : () -> Int) {
+      time_ := time;
+    };
 
     public func onChunk(msg : Types.ChunkMessage<Any>, ret : Types.ControlMessage) {
       let pos = msg.0;
