@@ -13,6 +13,8 @@ actor class Sender(receiverId : Principal) = self {
   type ControlMessage = Stream.ControlMessage;
   type ChunkMessage = Stream.ChunkMessage<?Text>;
 
+  let metrics = PT.PromTracker("", 65);
+
   let receiver = actor (Principal.toText(receiverId)) : actor {
     receive : (message : ChunkMessage) -> async ControlMessage;
   };
@@ -32,7 +34,7 @@ actor class Sender(receiverId : Principal) = self {
     };
   };
 
-  var tracker : ? Tracker.Sender = null;
+  var tracker : ?Tracker.Sender = null;
 
   func send(message : ChunkMessage) : async* ControlMessage {
     let ret = await receiver.receive(message);
@@ -46,16 +48,10 @@ actor class Sender(receiverId : Principal) = self {
     counter,
     null,
   );
-  
+
   sender.setKeepAlive(?(10 ** 15, Time.now));
 
-  tracker := ?Tracker.Sender({ 
-    lastChunkReceived = sender.lastChunkSent;
-    length = sender.length;
-    sent = sender.sent;
-    received = sender.received;
-    busyLevel = sender.busyLevel;
-  });
+  tracker := ?Tracker.Sender(metrics, sender);
 
   public shared func add(text : Text) : async () {
     Result.assertOk(sender.push(text));
@@ -70,7 +66,7 @@ actor class Sender(receiverId : Principal) = self {
     let ?path = Text.split(req.url, #char '?').next() else return HTTP.render400();
     let labels = "canister=\"" # PT.shortName(self) # "\"";
     switch (req.method, path, tracker) {
-      case ("GET", "/metrics", ?t) HTTP.renderPlainText(t.metrics.renderExposition(labels));
+      case ("GET", "/metrics", ?t) HTTP.renderPlainText(metrics.renderExposition(labels));
       case (_) HTTP.render400();
     };
   };

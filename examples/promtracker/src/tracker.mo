@@ -6,12 +6,12 @@ import Chunk "chunk";
 
 module {
   public class Receiver(
+    metrics : PT.PromTrackerTestable,
     pull : {
       lastChunkReceived : () -> Int;
       length : () -> Nat;
-    }
+    },
   ) {
-    public let metrics = PT.PromTracker("", 65);
     let chunk = Chunk.Chunk(metrics, pull.lastChunkReceived);
 
     ignore metrics.addPullValue("internal_length", "", pull.length);
@@ -20,16 +20,16 @@ module {
   };
 
   public class Sender(
+    metrics : PT.PromTrackerTestable,
     pull : {
-      lastChunkReceived : () -> Int;
+      lastChunkSent : () -> Int;
       sent : () -> Nat;
       received : () -> Nat;
       length : () -> Nat;
       busyLevel : () -> Nat;
     }
   ) {
-    public let metrics = PT.PromTracker("", 65);
-    let chunk = Chunk.Chunk(metrics, pull.lastChunkReceived);
+    let chunk = Chunk.Chunk(metrics, pull.lastChunkSent);
 
     ignore metrics.addPullValue("sent", "", pull.sent);
     ignore metrics.addPullValue("received", "", pull.received);
