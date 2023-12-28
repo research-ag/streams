@@ -5,6 +5,8 @@ import PT "mo:promtracker";
 import Chunk "chunk";
 
 module {
+  public func Empty() : Chunk.Empty { Chunk.Empty() };
+
   public class Receiver(
     metrics : PT.PromTrackerTestable,
     pull : {

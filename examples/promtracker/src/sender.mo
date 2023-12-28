@@ -34,12 +34,11 @@ actor class Sender(receiverId : Principal) = self {
     };
   };
 
-  var tracker : ?Tracker.Sender = null;
+  var tracker = Tracker.Empty();
 
   func send(message : ChunkMessage) : async* ControlMessage {
     let ret = await receiver.receive(message);
-    let ?t = tracker else return ret;
-    t.onChunk(message, ret);
+    tracker.onChunk(message, ret);
     ret;
   };
 
@@ -51,7 +50,7 @@ actor class Sender(receiverId : Principal) = self {
 
   sender.setKeepAlive(?(10 ** 15, Time.now));
 
-  tracker := ?Tracker.Sender(metrics, sender);
+  tracker := Tracker.Sender(metrics, sender);
 
   public shared func add(text : Text) : async () {
     Result.assertOk(sender.push(text));
@@ -65,8 +64,8 @@ actor class Sender(receiverId : Principal) = self {
   public query func http_request(req : HTTP.HttpRequest) : async HTTP.HttpResponse {
     let ?path = Text.split(req.url, #char '?').next() else return HTTP.render400();
     let labels = "canister=\"" # PT.shortName(self) # "\"";
-    switch (req.method, path, tracker) {
-      case ("GET", "/metrics", ?t) HTTP.renderPlainText(metrics.renderExposition(labels));
+    switch (req.method, path) {
+      case ("GET", "/metrics") HTTP.renderPlainText(metrics.renderExposition(labels));
       case (_) HTTP.render400();
     };
   };

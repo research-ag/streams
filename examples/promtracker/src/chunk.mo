@@ -7,6 +7,10 @@ import Types "../../../src/types";
 module {
   public type ChunkMessage = (Nat, { #chunk : [Any]; #ping; #restart });
 
+  public class Empty() {
+    public func onChunk(msg : Types.ChunkMessage<Any>, ret : Types.ControlMessage) {};
+  };
+
   public class Chunk(metrics : PT.PromTrackerTestable, time_ : () -> Int) {
     func time() : Nat = Int.abs(time_());
     
