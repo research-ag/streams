@@ -34,6 +34,13 @@ module {
     lastChunkSent : Int;
     shutdown : Bool;
   };
+  public type Callbacks = {
+    onNoSend : () -> ();
+    onSend : { #ping; #chunk : [Any] } -> ();
+    onError : Error.Error -> ();
+    onResponse : { #ok; #gap; #stop; #error } -> ();
+    onRestart : () -> ();
+  };
 
   /// Stream sender receiving items of type `Q` with `push` function and sending them with `sendFunc` callback when calling `sendChunk`.
   ///
@@ -53,6 +60,14 @@ module {
     counterCreator : () -> { accept(item : Q) : ?S },
     settings : ?SettingsArg,
   ) {
+    public var callbacks : Callbacks = {
+      onNoSend = func(_) {};
+      onSend = func(_) {};
+      onError = func(_) {};
+      onResponse = func(_) {};
+      onRestart = func(_) {};
+    };
+
     let buffer = SWB.SlidingWindowBuffer<Q>();
 
     let settings_ = {
@@ -174,13 +189,17 @@ module {
         (arg.1 () - lastChunkSent_) > arg.0;
       };
 
-      if (size == 0 and not shouldPing()) return;
+      if (size == 0 and not shouldPing()) {
+        callbacks.onNoSend();
+        return;
+      };
 
       let chunkMessage = if (size > 0) #chunk elements else #ping;
 
       updateTime();
       concurrentChunks += 1;
 
+      callbacks.onSend(chunkMessage);
       let res = try {
         await* sendFunc((start, chunkMessage));
       } catch (e) {
@@ -197,6 +216,7 @@ module {
           // moc interpreter we can simulate #canister_reject but not
           // #canister_error.
         };
+        callbacks.onError(e);
         #error;
       };
 
@@ -238,6 +258,8 @@ module {
 
       // stop stream
       if (res == #stop) stopped := true;
+      
+      callbacks.onResponse(res);
     };
 
     /// Restart the sender in case it's stopped after receiving `#stop` from `sendFunc`.
@@ -246,7 +268,10 @@ module {
       let res = try {
         await* sendFunc((head, #restart));
       } catch (_) #error;
-      if (res == #ok) stopped := false;
+      if (res == #ok) {
+        stopped := false;
+        callbacks.onRestart();
+      };
       return res == #ok;
     };
 
