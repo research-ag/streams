@@ -7,7 +7,7 @@ import Types "../../../src/types";
 module {
   public type ChunkMessage = (Nat, { #chunk : [Any]; #ping; #restart });
 
-  public class Chunk(metrics : PT.PromTrackerTestable) {
+  public class Chunk(metrics : PT.PromTracker) {
     var time_ = func() : Int = (0 : Int);
     func time() : Nat = Int.abs(time_());
 

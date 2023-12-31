@@ -10,7 +10,7 @@ import Types "../../../src/types";
 
 module {
   public class Receiver(
-    metrics : PT.PromTrackerTestable
+    metrics : PT.PromTracker
   ) {
     let chunk = Chunk.Chunk(metrics);
 
@@ -35,7 +35,7 @@ module {
     var callbacks : StreamSender.Callbacks;
   };
 
-  public class Sender(metrics : PT.PromTrackerTestable) {
+  public class Sender(metrics : PT.PromTracker) {
     public let metrics = PT.PromTracker("", 65);
     var sender_ : ?SenderInterface = null;
 
