@@ -200,6 +200,7 @@ module {
       concurrentChunks += 1;
 
       callbacks.onSend(chunkMessage);
+
       let res = try {
         await* sendFunc((start, chunkMessage));
       } catch (e) {

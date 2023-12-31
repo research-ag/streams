@@ -10,8 +10,14 @@ actor class Receiver() = self {
   type ControlMessage = Stream.ControlMessage;
   type ChunkMessage = Stream.ChunkMessage<?Text>;
 
+  var store : ?Text = null;
+
+  public func lastReceived() : async ?Text {
+    store;
+  };
+
   let receiver = Stream.StreamReceiver<?Text>(
-    func(_ : Nat, _ : ?Text) {},
+    func(_ : Nat, item : ?Text) = store := item,
     ?(10 ** 15, Time.now),
   );
 
