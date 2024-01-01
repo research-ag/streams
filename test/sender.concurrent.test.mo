@@ -58,7 +58,7 @@ class Sender(n : Nat) {
     ?{
       keepAlive = ?(1, func() = time);
       maxQueueSize = null;
-      maxConcurrentChunks = null;
+      windowSize = null;
     },
   );
 
@@ -88,7 +88,7 @@ class Sender(n : Nat) {
   };
 
   public func setMaxN(n : Nat) {
-    sender.setMaxConcurrentChunks(n);
+    sender.setWindowSize(n);
   };
 
   public func status() : StreamSender.Status = sender.status();
