@@ -9,9 +9,7 @@ import StreamSender "../../../src/StreamSender";
 import Types "../../../src/types";
 
 module {
-  public class Receiver(
-    metrics : PT.PromTracker
-  ) {
+  public class Receiver(metrics : PT.PromTracker) {
     let chunk = Chunk.Chunk(metrics);
 
     public func init<T>(receiver : StremReceiver.StreamReceiver<T>) {
@@ -37,7 +35,6 @@ module {
   };
 
   public class Sender(metrics : PT.PromTracker, stable_ : Bool) {
-    public let metrics = PT.PromTracker("", 65);
     var sender_ : ?SenderInterface = null;
 
     // on send 

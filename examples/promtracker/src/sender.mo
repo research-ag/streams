@@ -58,7 +58,7 @@ actor class Sender(receiverId : Principal) = self {
     let ?path = Text.split(req.url, #char '?').next() else return HTTP.render400();
     let labels = "canister=\"" # PT.shortName(self) # "\"";
     switch (req.method, path) {
-      case ("GET", "/metrics") HTTP.renderPlainText(tracker.metrics.renderExposition(labels));
+      case ("GET", "/metrics") HTTP.renderPlainText(metrics.renderExposition(labels));
       case (_) HTTP.render400();
     };
   };
