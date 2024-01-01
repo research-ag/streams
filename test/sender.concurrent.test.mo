@@ -54,13 +54,9 @@ class Sender(n : Nat) {
 
   let sender = StreamSender.StreamSender<Text, ?Text>(
     sendChunkMessage,
-    Base.create(1),
-    ?{
-      keepAlive = ?(1, func() = time);
-      maxQueueSize = null;
-      windowSize = null;
-    },
+    Base.create(1)
   );
+  sender.setKeepAlive(?(1, func() = time));
 
   public func send(chunk : Chunk) : async () {
     chunkRegister := chunk;

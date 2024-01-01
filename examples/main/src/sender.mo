@@ -30,11 +30,7 @@ actor class Sender(receiverId : Principal) {
     await receiver.receive(message);
   };
 
-  let sender = Stream.StreamSender<Text, ?Text>(
-    send,
-    counter,
-    null
-  );
+  let sender = Stream.StreamSender<Text, ?Text>(send, counter);
 
   public shared func add(text : Text) : async () {
     Result.assertOk(sender.push(text));

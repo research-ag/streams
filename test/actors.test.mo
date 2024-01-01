@@ -153,11 +153,7 @@ actor A {
     };
   };
 
-  let sender = StreamSender.StreamSender<Text, ?Text>(
-    sendToReceiver,
-    counter,
-    null,
-  );
+  let sender = StreamSender.StreamSender<Text, ?Text>(sendToReceiver, counter);
 
   public func submit(item : Text) : async { #err : { #NoSpace }; #ok : Nat } {
     let res = sender.push(item);
