@@ -36,7 +36,7 @@ module {
   };
   public type Callbacks = {
     onNoSend : () -> ();
-    onSend : { #ping; #chunk : [Any] } -> ();
+    onSend : Types.ChunkInfo -> ();
     onError : Error.Error -> ();
     onResponse : { #ok; #gap; #stop; #error } -> ();
     onRestart : () -> ();
@@ -197,20 +197,21 @@ module {
         return;
       };
 
-      let chunkMessage = if (size > 0) #chunk elements else #ping;
+      let chunkPayload = if (size > 0) #chunk elements else #ping;
 
       updateTime();
       concurrentChunks += 1;
 
-      callbacks.onSend(chunkMessage);
+      callbacks.onSend(Types.info(chunkPayload));
 
       let res = try {
-        await* sendFunc((start, chunkMessage));
+        await* sendFunc((start, chunkPayload));
       } catch (e) {
         // shutdown on permanent system errors
         switch (Error.code(e)) {
           case (#system_fatal or #destination_invalid or #future _) shutdown := true;
-          case (_) {};
+          case (#canister_error or #canister_reject) {};
+          case (#system_transient or #call_error _) {};
           // TODO: revisit #canister_reject after an IC protocol bug is fixed.
           // Currently, a stopped receiver responds with #canister_reject.
           // In the future it should be #canister_error.

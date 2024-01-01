@@ -11,10 +11,7 @@ actor class Receiver() = self {
   type ChunkMessage = Stream.ChunkMessage<?Text>;
 
   var store : ?Text = null;
-
-  public func lastReceived() : async ?Text {
-    store;
-  };
+  public func lastReceived() : async ?Text { store };
 
   let receiver = Stream.StreamReceiver<?Text>(
     func(_ : Nat, item : ?Text) = store := item,
