@@ -22,7 +22,7 @@ module {
   /// Settings of `StreamSender`.
   public type SettingsArg = {
     maxQueueSize : ?Nat;
-    maxConcurrentChunks : ?Nat;
+    windowSize : ?Nat;
     keepAlive : ?(Nat, () -> Int);
   };
 
@@ -52,7 +52,7 @@ module {
   /// Typical implementation of `counter` is to accept items while their total size is less then given maximum chunk size.
   /// * `settings` consists of:
   ///   * `maxQueueSize` is maximum number of elements, which can simultaneously be in `StreamSender`'s queue. Default value is infinity.
-  ///   * `maxConcurrentChunks` is maximum number of concurrent `sendChunk` calls. Default value is `MAX_CONCURRENT_CHUNKS_DEFAULT`.
+  ///   * `windowSize` is maximum number of concurrent `sendChunk` calls. Default value is `MAX_CONCURRENT_CHUNKS_DEFAULT`.
   ///   * `keepAlive` is pair of period in seconds after which `StreamSender` should send ping chunk in case if there is no items to send and current time function.
   ///     Default value means not to ping.
   public class StreamSender<Q, S>(
@@ -73,11 +73,14 @@ module {
     let settings_ = {
       var maxQueueSize = Option.chain<SettingsArg, Nat>(settings, func(s) = s.maxQueueSize);
       var keepAlive = Option.chain<SettingsArg, (Nat, () -> Int)> (settings, func(s) = s.keepAlive);
-      var maxConcurrentChunks : Nat = Option.get(
-        Option.chain<SettingsArg, Nat>(settings, func(s) = s.maxConcurrentChunks),
+      var windowSize : Nat = Option.get(
+        Option.chain<SettingsArg, Nat>(settings, func(s) = s.windowSize),
         MAX_CONCURRENT_CHUNKS_DEFAULT,
       );
     };
+    public func maxQueueSize() : ?Nat = settings_.maxQueueSize;
+    public func windowSize() : Nat = settings_.windowSize;
+    public func keepAliveTime() : ?Nat = Option.map<(Nat, () -> Int), Nat>(settings_.keepAlive, func(x) = x.0);
 
     var stopped = false;
     var paused = false;
@@ -149,7 +152,7 @@ module {
       if (shutdown) return #shutdown;
       if (stopped) return #stopped;
       if (paused) return #paused;
-      if (concurrentChunks == settings_.maxConcurrentChunks) return #busy;
+      if (concurrentChunks == settings_.windowSize) return #busy;
       return #ready;
     };
 
@@ -165,7 +168,7 @@ module {
       if (shutdown) throw Error.reject("Sender shut down");
       if (stopped) throw Error.reject("Stream stopped by receiver");
       if (paused) throw Error.reject("Stream is paused");
-      if (concurrentChunks == settings_.maxConcurrentChunks) throw Error.reject("Stream is busy");
+      if (concurrentChunks == settings_.windowSize) throw Error.reject("Stream is busy");
 
       let start = head;
       let elements = do {
@@ -280,7 +283,7 @@ module {
     public func setMaxQueueSize(n : ?Nat) = settings_.maxQueueSize := n;
 
     /// Update max amount of concurrent outgoing requests.
-    public func setMaxConcurrentChunks(n : Nat) = settings_.maxConcurrentChunks := n;
+    public func setWindowSize(n : Nat) = settings_.windowSize := n;
 
     /// Update max interval between stream calls.
     public func setKeepAlive(seconds : ?(Nat, () -> Int)) {
@@ -319,7 +322,7 @@ module {
     public func isStopped() : Bool = stopped;
 
     /// Check busy status of sender.
-    public func isBusy() : Bool = concurrentChunks == settings_.maxConcurrentChunks;
+    public func isBusy() : Bool = concurrentChunks == settings_.windowSize;
 
     /// Check busy level of sender, e.g. current amount of outgoing calls in flight.
     public func busyLevel() : Nat = concurrentChunks;

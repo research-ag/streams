@@ -32,6 +32,7 @@ module {
     received : () -> Nat;
     length : () -> Nat;
     lastChunkSent : () -> Int;
+    windowSize : () -> Nat;
     var callbacks : StreamSender.Callbacks;
   };
 
@@ -40,7 +41,7 @@ module {
     var sender_ : ?SenderInterface = null;
 
     // on send 
-    let busyLevel = metrics.addGauge("busy_level", "", #both, [], true);
+    let busyLevel = metrics.addGauge("window_size", "", #both, [], true);
     let queueSizePreBatch = metrics.addGauge("queue_size_pre_batch", "", #both, [], true);
     let queueSizePostBatch = metrics.addGauge("queue_size_post_batch", "", #both, [], true);
     let chunkSize = metrics.addGauge("chunk_size", "", #both, Array.tabulate<Nat>(8, func(i) = 8 ** i), false);
@@ -75,6 +76,7 @@ module {
       ignore metrics.addPullValue("length", "", sender.length);
       ignore metrics.addPullValue("last_chunk_sent", "", func() : Nat { Int.abs(sender.lastChunkSent()) / 10 ** 9 });
       ignore metrics.addPullValue("shutdown", "", func() = if (sender.isShutdown()) 1 else 0);
+      ignore metrics.addPullValue("setting_window_size", "", sender.windowSize);
     };
 
     public func onSend(c : { #ping; #chunk : [Any] }) {
