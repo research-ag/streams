@@ -257,12 +257,14 @@ module {
       if (pausingNow) paused := true;
 
       // unpause stream
-      concurrentChunks -= 1;
+      if (concurrentChunks > 0) {
+        concurrentChunks -= 1;
+      } else shutdown := true;
       if (concurrentChunks == 0) paused := false;
 
       // stop stream
       if (res == #stop) stopped := true;
-      
+
       callbacks.onResponse(res);
     };
 
@@ -295,7 +297,7 @@ module {
 
     // Last chunk sent time
     public func lastChunkSent() : Int = lastChunkSent_;
-    
+
     /// Total amount of items, ever added to the stream sender.
     /// Equals the index which will be assigned to the next item.
     public func length() : Nat = buffer.end();
