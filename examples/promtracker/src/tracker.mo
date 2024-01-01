@@ -79,7 +79,7 @@ module {
       ignore metrics.addPullValue("setting_window_size", "", sender.windowSize);
     };
 
-    public func onSend(c : { #ping; #chunk : [Any] }) {
+    public func onSend(c : Types.ChunkInfo) {
       let ?s = sender_ else return;
       busyLevel.update(s.busyLevel());
       queueSizePostBatch.update(s.queueSize());
@@ -88,9 +88,9 @@ module {
           pings.add(1);
           queueSizePreBatch.update(s.queueSize());
         };
-        case (#chunk x) {
-          chunkSize.update(x.size());
-          queueSizePreBatch.update(s.queueSize() + x.size());
+        case (#chunk size) {
+          chunkSize.update(size);
+          queueSizePreBatch.update(s.queueSize() + size);
         }
       };
     };
