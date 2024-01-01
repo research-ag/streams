@@ -36,30 +36,30 @@ module {
     var callbacks : StreamSender.Callbacks;
   };
 
-  public class Sender(metrics : PT.PromTracker) {
+  public class Sender(metrics : PT.PromTracker, stable_ : Bool) {
     public let metrics = PT.PromTracker("", 65);
     var sender_ : ?SenderInterface = null;
 
     // on send 
-    let busyLevel = metrics.addGauge("window_size", "", #both, [], true);
-    let queueSizePreBatch = metrics.addGauge("queue_size_pre_batch", "", #both, [], true);
-    let queueSizePostBatch = metrics.addGauge("queue_size_post_batch", "", #both, [], true);
-    let chunkSize = metrics.addGauge("chunk_size", "", #both, Array.tabulate<Nat>(8, func(i) = 8 ** i), false);
-    let pings = metrics.addCounter("total_pings", "", true);
-    let skips = metrics.addCounter("total_skips", "", true);
+    let busyLevel = metrics.addGauge("window_size", "", #both, [], stable_);
+    let queueSizePreBatch = metrics.addGauge("queue_size_pre_batch", "", #both, [], stable_);
+    let queueSizePostBatch = metrics.addGauge("queue_size_post_batch", "", #both, [], stable_);
+    let chunkSize = metrics.addGauge("chunk_size", "", #both, Array.tabulate<Nat>(8, func(i) = 8 ** i), stable_);
+    let pings = metrics.addCounter("total_pings", "", stable_);
+    let skips = metrics.addCounter("total_skips", "", stable_);
 
     // on response
-    let oks = metrics.addCounter("total_oks", "", true);
-    let gaps = metrics.addCounter("total_gaps", "", true);
-    let stops = metrics.addCounter("total_stops", "", true);
-    let errors = metrics.addCounter("total_errors", "", true);
-    let stopFlag = metrics.addGauge("stop_flag", "", #both, [], true);
-    let pausedFlag = metrics.addGauge("paused_flag", "", #both, [], true);
-    let lastStopPos = metrics.addCounter("last_stop_pos", "", true);
-    let lastRestartPos = metrics.addCounter("last_restart_pos", "", true);
+    let oks = metrics.addCounter("total_oks", "", stable_);
+    let gaps = metrics.addCounter("total_gaps", "", stable_);
+    let stops = metrics.addCounter("total_stops", "", stable_);
+    let errors = metrics.addCounter("total_errors", "", stable_);
+    let stopFlag = metrics.addGauge("stop_flag", "", #both, [], stable_);
+    let pausedFlag = metrics.addGauge("paused_flag", "", #both, [], stable_);
+    let lastStopPos = metrics.addCounter("last_stop_pos", "", stable_);
+    let lastRestartPos = metrics.addCounter("last_restart_pos", "", stable_);
 
     // on error
-    let chunkErrorType = metrics.addGauge("chunk_error_type", "", #none, [0, 1, 2, 3, 4, 5, 6], true);
+    let chunkErrorType = metrics.addGauge("chunk_error_type", "", #none, [0, 1, 2, 3, 4, 5, 6], stable_);
 
     public func init(sender : SenderInterface) {
       sender_ := ?sender;
