@@ -12,6 +12,10 @@ module {
   /// Stream length, last chunk received timestamp, stopped flag.
   public type StableData = (Nat, Int, Bool);
 
+  public type Callbacks = {
+    onChunk : (Types.ChunkMessageInfo, ControlMessage) -> ();
+  };
+
   /// StreamReceiver
   /// * receives chunk by `onChunk` call
   /// * validates `start` position in ChunkMessage (must match internal `length` variable)
@@ -24,6 +28,10 @@ module {
     itemCallback : (pos : Nat, item : T) -> (),
     timeoutArg : ?(Nat, () -> Int),
   ) {
+    public var callbacks : Callbacks = {
+      onChunk = func(_) {};
+    };
+
     var stopped_ = false;
     var length_ = 0;
     var lastChunkReceived_ : Int = 0;
@@ -62,6 +70,12 @@ module {
     /// Otherwise processes a chunk and call `itemCallback` on each item.
     /// A #ping message is handled equivalently to a #chunk of length zero.
     public func onChunk(cm : Types.ChunkMessage<T>) : Types.ControlMessage {
+      let ret = processChunk(cm);
+      callbacks.onChunk(Types.chunkMessageInfo(cm), ret);
+      ret
+    };
+
+    func processChunk(cm : Types.ChunkMessage<T>) : Types.ControlMessage {
       let (start, msg) = cm;
       if (start != length_) return #gap;
       switch (msg) {

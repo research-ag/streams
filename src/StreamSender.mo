@@ -72,7 +72,7 @@ module {
 
     let settings_ = {
       var maxQueueSize = Option.chain<SettingsArg, Nat>(settings, func(s) = s.maxQueueSize);
-      var keepAlive = Option.chain<SettingsArg, (Nat, () -> Int)> (settings, func(s) = s.keepAlive);
+      var keepAlive = Option.chain<SettingsArg, (Nat, () -> Int)>(settings, func(s) = s.keepAlive);
       var windowSize : Nat = Option.get(
         Option.chain<SettingsArg, Nat>(settings, func(s) = s.windowSize),
         MAX_CONCURRENT_CHUNKS_DEFAULT,
