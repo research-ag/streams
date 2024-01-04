@@ -30,25 +30,32 @@ Maximum concurrent chunks number.
 
 ## Type `Settings`
 ``` motoko no-repl
-type Settings = { maxQueueSize : ?Nat; maxConcurrentChunks : ?Nat; keepAlive : ?(Nat, () -> Int) }
+type Settings = { var maxQueueSize : ?Nat; var windowSize : Nat; var keepAlive : ?(Nat, () -> Int) }
 ```
 
 Settings of `StreamSender`.
 
 ## Type `StableData`
 ``` motoko no-repl
-type StableData<T> = { buffer : SWB.StableData<T>; stopped : Bool; paused : Bool; head : Nat; lastChunkSent : Int; concurrentChunks : Nat; shutdown : Bool }
+type StableData<T> = { buffer : SWB.StableData<T>; stopped : Bool; head : Nat; lastChunkSent : Int; shutdown : Bool }
 ```
 
 Type of `StableData` for `share`/`unshare` function.
 
-## Class `StreamSender<T, S>`
-
+## Type `Callbacks`
 ``` motoko no-repl
-class StreamSender<T, S>(counterCreator : () -> { accept : (item : T) -> ?S }, sendFunc : (x : Types.ChunkMessage<S>) -> async* Types.ControlMessage, settings : ?Settings)
+type Callbacks = { var onNoSend : () -> (); var onSend : Types.ChunkInfo -> (); var onError : Error.Error -> (); var onResponse : (Types.ControlMessage or {#error}) -> (); var onRestart : () -> () }
 ```
 
-Stream sender receiving items of type `T` with `push` function and sending them with `sendFunc` callback when calling `sendChunk`.
+Callbacks called in different places of sending chunk.
+
+## Class `StreamSender<Q, S>`
+
+``` motoko no-repl
+class StreamSender<Q, S>(sendFunc : (x : Types.ChunkMessage<S>) -> async* Types.ControlMessage, counterCreator : () -> { accept : (item : Q) -> ?S })
+```
+
+Stream sender receiving items of type `Q` with `push` function and sending them with `sendFunc` callback when calling `sendChunk`.
 
 Arguments:
 * `sendFunc` typically should implement sending chunk to the receiver canister.
@@ -56,15 +63,18 @@ Arguments:
 `accept` function is called sequentially on items which are added to the chunk, until receiving `null`.
 If the item is accepted it should be converted to type `S`.
 Typical implementation of `counter` is to accept items while their total size is less then given maximum chunk size.
-* `settings` consists of:
-  * `maxQueueSize` is maximum number of elements, which can simultaneously be in `StreamSender`'s queue. Default value is infinity.
-  * `maxConcurrentChunks` is maximum number of concurrent `sendChunk` calls. Default value is `MAX_CONCURRENT_CHUNKS_DEFAULT`.
-  * `keepAlive` is pair of period in seconds after which `StreamSender` should send ping chunk in case if there is no items to send and current time function.
-    Default value means not to ping.
+
+### Value `callbacks`
+``` motoko no-repl
+let callbacks : Callbacks
+```
+
+Callbacks called during sending chunk.
+
 
 ### Function `share`
 ``` motoko no-repl
-func share() : StableData<T>
+func share() : StableData<Q>
 ```
 
 Share data in order to store in stable varible. No validation is performed.
@@ -72,7 +82,7 @@ Share data in order to store in stable varible. No validation is performed.
 
 ### Function `unshare`
 ``` motoko no-repl
-func unshare(data : StableData<T>)
+func unshare(data : StableData<Q>)
 ```
 
 Unhare data in order to store in stable varible. No validation is performed.
@@ -80,7 +90,7 @@ Unhare data in order to store in stable varible. No validation is performed.
 
 ### Function `push`
 ``` motoko no-repl
-func push(item : T) : Result.Result<Nat, {#NoSpace}>
+func push(item : Q) : Result.Result<Nat, {#NoSpace}>
 ```
 
 Add item to the `StreamSender`'s queue. Return number of succesfull `push` call, or error in case of lack of space.
@@ -140,12 +150,85 @@ func restart() : async Bool
 Restart the sender in case it's stopped after receiving `#stop` from `sendFunc`.
 
 
+### Function `maxQueueSize`
+``` motoko no-repl
+func maxQueueSize() : ?Nat
+```
+
+Get `maxQueueSize` setting.
+`maxQueueSize` is maximum number of elements, which can simultaneously be in `StreamSender`'s queue. Default value is infinity.
+
+
+### Function `windowSize`
+``` motoko no-repl
+func windowSize() : Nat
+```
+
+Get `windowSize` setting.
+`windowSize` is maximum number of concurrent `sendChunk` calls. Default value is `MAX_CONCURRENT_CHUNKS_DEFAULT`.
+
+
+### Function `keepAliveTime`
+``` motoko no-repl
+func keepAliveTime() : ?Nat
+```
+
+Get `keepAlive` setting.
+`keepAlive` is pair of period in seconds after which `StreamSender` should send ping chunk in case if there is no items to send and current time function.
+Default value means not to ping.
+
+
+### Function `setMaxQueueSize`
+``` motoko no-repl
+func setMaxQueueSize(n : ?Nat)
+```
+
+Update max queue size.
+`maxQueueSize` is maximum number of elements, which can simultaneously be in `StreamSender`'s queue. Default value is infinity.
+
+
+### Function `setWindowSize`
+``` motoko no-repl
+func setWindowSize(n : Nat)
+```
+
+Update max amount of concurrent outgoing requests.
+`windowSize` is maximum number of concurrent `sendChunk` calls. Default value is `MAX_CONCURRENT_CHUNKS_DEFAULT`.
+
+
+### Function `setKeepAlive`
+``` motoko no-repl
+func setKeepAlive(seconds : ?(Nat, () -> Int))
+```
+
+Update max interval between stream calls.
+`keepAlive` is pair of period in seconds after which `StreamSender` should send ping chunk in case if there is no items to send and current time function.
+Default value means not to ping.
+
+
+### Function `lastChunkSent`
+``` motoko no-repl
+func lastChunkSent() : Int
+```
+
+Last chunk sent time
+
+
 ### Function `length`
 ``` motoko no-repl
 func length() : Nat
 ```
 
-Total amount of items, ever added to the stream sender, also an index, which will be assigned to the next item
+Total amount of items, ever added to the stream sender.
+Equals the index which will be assigned to the next item.
+
+
+### Function `queueSize`
+``` motoko no-repl
+func queueSize() : Nat
+```
+
+Internal queue size
 
 
 ### Function `sent`
@@ -166,7 +249,7 @@ Amount of items, successfully sent and acknowledged by receiver.
 
 ### Function `get`
 ``` motoko no-repl
-func get(index : Nat) : ?T
+func get(index : Nat) : ?Q
 ```
 
 Get item from queue by index.
@@ -218,27 +301,3 @@ func isPaused() : Bool
 ```
 
 Check paused status of sender.
-
-
-### Function `setMaxQueueSize`
-``` motoko no-repl
-func setMaxQueueSize(value : ?Nat)
-```
-
-Update max queue size.
-
-
-### Function `setMaxConcurrentChunks`
-``` motoko no-repl
-func setMaxConcurrentChunks(value : ?Nat)
-```
-
-Update max amount of concurrent outgoing requests.
-
-
-### Function `setKeepAlive`
-``` motoko no-repl
-func setKeepAlive(seconds : ?(Nat, () -> Int))
-```
-
-Update max interval between stream calls.
