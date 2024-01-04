@@ -12,8 +12,9 @@ module {
   /// Stream length, last chunk received timestamp, stopped flag.
   public type StableData = (Nat, Int, Bool);
 
+  /// Callbacks called during processing chunk.
   public type Callbacks = {
-    onChunk : (Types.ChunkMessageInfo, ControlMessage) -> ();
+    var onChunk : (Types.ChunkMessageInfo, ControlMessage) -> ();
   };
 
   /// StreamReceiver
@@ -28,8 +29,10 @@ module {
     itemCallback : (pos : Nat, item : T) -> (),
     timeoutArg : ?(Nat, () -> Int),
   ) {
-    public var callbacks : Callbacks = {
-      onChunk = func(_) {};
+
+    /// Callbacks called during processing chunk.
+    public let callbacks : Callbacks = {
+      var onChunk = func(_) {};
     };
 
     var stopped_ = false;
@@ -72,7 +75,7 @@ module {
     public func onChunk(cm : Types.ChunkMessage<T>) : Types.ControlMessage {
       let ret = processChunk(cm);
       callbacks.onChunk(Types.chunkMessageInfo(cm), ret);
-      ret
+      ret;
     };
 
     func processChunk(cm : Types.ChunkMessage<T>) : Types.ControlMessage {

@@ -8,6 +8,7 @@ module {
       #restart;
     },
   );
+
   public type ChunkMessageInfo = (
     pos : Nat,
     {
@@ -16,6 +17,7 @@ module {
       #restart;
     },
   );
+  
   public func chunkMessageInfo(m : ChunkMessage<Any>) : ChunkMessageInfo {
     (
       m.0,
