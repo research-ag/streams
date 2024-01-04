@@ -8,6 +8,7 @@ import StreamReceiver "StreamReceiver";
 import StreamSender "StreamSender";
 import Types "types";
 
+/// See use example in examples/promtracker.
 module {
   type ReceiverInterface = {
     length : () -> Nat;
