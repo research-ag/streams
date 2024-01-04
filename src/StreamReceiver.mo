@@ -29,7 +29,6 @@ module {
     itemCallback : (pos : Nat, item : T) -> (),
     timeoutArg : ?(Nat, () -> Int),
   ) {
-
     /// Callbacks called during processing chunk.
     public let callbacks : Callbacks = {
       var onChunk = func(_) {};

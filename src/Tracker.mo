@@ -4,9 +4,9 @@ import Int "mo:base/Int";
 import Option "mo:base/Option";
 import Time "mo:base/Time";
 import PT "mo:promtracker";
-import StreamReceiver "../../../src/StreamReceiver";
-import StreamSender "../../../src/StreamSender";
-import Types "../../../src/types";
+import StreamReceiver "StreamReceiver";
+import StreamSender "StreamSender";
+import Types "types";
 
 module {
   type ReceiverInterface = {
@@ -14,6 +14,7 @@ module {
     callbacks : StreamReceiver.Callbacks;
   };
 
+  /// Receiver tracker.
   public class Receiver(metrics : PT.PromTracker, stable_ : Bool) {
     var receiver_ : ?ReceiverInterface = null;
     var previousTime : Nat = 0;
@@ -83,6 +84,7 @@ module {
     callbacks : StreamSender.Callbacks;
   };
 
+  /// Sender tracker.
   public class Sender(metrics : PT.PromTracker, stable_ : Bool) {
     var sender_ : ?SenderInterface = null;
 
