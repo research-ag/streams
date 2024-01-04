@@ -10,7 +10,7 @@ import Types "types";
 
 /// See use example in examples/promtracker.
 module {
-  type ReceiverInterface = {
+  public type ReceiverInterface = {
     length : () -> Nat;
     callbacks : StreamReceiver.Callbacks;
   };
@@ -71,7 +71,7 @@ module {
     };
   };
 
-  type SenderInterface = {
+  public type SenderInterface = {
     busyLevel : () -> Nat;
     isPaused : () -> Bool;
     isStopped : () -> Bool;
