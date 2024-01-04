@@ -74,6 +74,7 @@ module {
       var keepAlive = null;
       var windowSize = MAX_CONCURRENT_CHUNKS_DEFAULT
     };
+
     public func maxQueueSize() : ?Nat = settings_.maxQueueSize;
     public func windowSize() : Nat = settings_.windowSize;
     public func keepAliveTime() : ?Nat = Option.map<(Nat, () -> Int), Nat>(settings_.keepAlive, func(x) = x.0);

@@ -2,22 +2,76 @@ import Array "mo:base/Array";
 import Error "mo:base/Error";
 import Int "mo:base/Int";
 import Option "mo:base/Option";
+import Time "mo:base/Time";
 import PT "mo:promtracker";
-import Chunk "chunk";
-import StremReceiver "../../../src/StreamReceiver";
+import StreamReceiver "../../../src/StreamReceiver";
 import StreamSender "../../../src/StreamSender";
 import Types "../../../src/types";
 
 module {
-  public class Receiver(metrics : PT.PromTracker) {
-    let chunk = Chunk.Chunk(metrics);
 
-    public func init<T>(receiver : StremReceiver.StreamReceiver<T>) {
-      chunk.init(receiver.lastChunkReceived);
-      ignore metrics.addPullValue("internal_length", "", receiver.length);
+  type ReceiverInterface = {
+    length : () -> Nat;
+    var callbacks : StreamReceiver.Callbacks;
+  };
+
+  public class Receiver(metrics : PT.PromTracker, stable_ : Bool) {
+    var receiver_ : ?ReceiverInterface = null;
+    var previousTime : Nat = 0;
+
+    // gauges
+    let chunkSize = metrics.addGauge("chunk_size", "", #both, Array.tabulate<Nat>(8, func(i) = 8 ** i), stable_);
+    let stopFlag = metrics.addGauge("stop_flag", "", #both, [], stable_);
+
+    // pulls
+    ignore metrics.addPullValue("last_chunk_received", "", func() = previousTime);
+
+    // counters
+    let chunksOk = metrics.addCounter("total_chunks_ok", "", stable_);
+    let pingsOk = metrics.addCounter("total_pings_ok", "", stable_);
+    let gaps = metrics.addCounter("total_gaps", "", stable_);
+    let stops = metrics.addCounter("total_stops", "", stable_);
+    let restarts = metrics.addCounter("total_restarts", "", stable_);
+    let lastStopPos = metrics.addCounter("last_stop_pos", "", stable_);
+    let lastRestartPos = metrics.addCounter("last_restart_pos", "", stable_);
+    let timeSinceLastChunk = metrics.addGauge("time_since_last_chunk", "", #both, [], stable_);
+
+    public func init(receiver : ReceiverInterface) {
+      receiver_ := ?receiver;
+      receiver.callbacks := {
+        onChunk = onChunk;
+      };
+      ignore metrics.addPullValue("length", "", receiver.length);
     };
 
-    public let onChunk = chunk.onChunk;
+    public func onChunk(info : Types.ChunkMessageInfo, ret : Types.ControlMessage) {
+      //let ?r = receiver_ else return;
+      let (pos, msg) = info;
+      switch (msg, ret) {
+        case (#chunk size, #ok) {
+          chunksOk.add(1);
+          chunkSize.update(size);
+        };
+        case (#ping, #ok) pingsOk.add(1);
+        case (#restart, #ok) {
+          restarts.add(1);
+          stopFlag.update(0);
+          lastRestartPos.set(pos);
+        };
+        case (_, #gap) gaps.add(1);
+        case (_, #stop) {
+          stops.add(1);
+          stopFlag.update(1);
+          lastStopPos.set(pos);
+        };
+      };
+      let now = Int.abs(Time.now()) / 10 ** 6;
+      if (ret != #gap and msg != #restart and previousTime != 0) {
+        timeSinceLastChunk.update(now - previousTime);
+      };
+      previousTime := now;
+    };
+
   };
 
   type SenderInterface = {
@@ -37,7 +91,7 @@ module {
   public class Sender(metrics : PT.PromTracker, stable_ : Bool) {
     var sender_ : ?SenderInterface = null;
 
-    // on send 
+    // on send
     let busyLevel = metrics.addGauge("window_size", "", #both, [], stable_);
     let queueSizePreBatch = metrics.addGauge("queue_size_pre_batch", "", #both, [], stable_);
     let queueSizePostBatch = metrics.addGauge("queue_size_post_batch", "", #both, [], stable_);
@@ -88,7 +142,7 @@ module {
         case (#chunk size) {
           chunkSize.update(size);
           queueSizePreBatch.update(s.queueSize() + size);
-        }
+        };
       };
     };
 

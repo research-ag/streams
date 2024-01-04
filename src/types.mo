@@ -8,6 +8,24 @@ module {
       #restart;
     },
   );
+  public type ChunkMessageInfo = (
+    pos : Nat,
+    {
+      #chunk : Nat;
+      #ping;
+      #restart;
+    },
+  );
+  public func chunkMessageInfo(m : ChunkMessage<Any>) : ChunkMessageInfo {
+    (
+      m.0,
+      switch (m.1) {
+        case (#chunk c) #chunk(c.size());
+        case (#ping) #ping;
+        case (#restart) #restart;
+      },
+    );
+  };
 
   public type ChunkPayload<T> = {
     #chunk : [T];
