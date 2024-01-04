@@ -33,7 +33,7 @@ actor class Sender(receiverId : Principal) = self {
   };
 
   let metrics = PT.PromTracker("", 65);
-  let tracker = Tracker.Sender(metrics, true);
+  let tracker = Tracker.Sender(metrics, "", true);
 
   let sender = Stream.StreamSender<Text, ?Text>(
     func(x : ChunkMessage) : async* ControlMessage { await receiver.receive(x) },
