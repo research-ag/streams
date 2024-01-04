@@ -142,7 +142,7 @@ module {
       if (shutdown) return #shutdown;
       if (stopped) return #stopped;
       if (paused) return #paused;
-      if (isBusy()) return #busy;
+      if (concurrentChunks == settings.windowSize) return #busy;
       return #ready;
     };
 
@@ -158,7 +158,7 @@ module {
       if (shutdown) throw Error.reject("Sender shut down");
       if (stopped) throw Error.reject("Stream stopped by receiver");
       if (paused) throw Error.reject("Stream is paused");
-      if (isBusy()) throw Error.reject("Stream is busy");
+      if (concurrentChunks == settings.windowSize) throw Error.reject("Stream is busy");
 
       let start = head;
       let elements = do {
