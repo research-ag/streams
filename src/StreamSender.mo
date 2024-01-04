@@ -20,10 +20,10 @@ module {
   public let MAX_CONCURRENT_CHUNKS_DEFAULT = 5;
 
   /// Settings of `StreamSender`.
-  public type SettingsArg = {
-    maxQueueSize : ?Nat;
-    windowSize : ?Nat;
-    keepAlive : ?(Nat, () -> Int);
+  public type Settings = {
+    var maxQueueSize : ?Nat;
+    var windowSize : Nat;
+    var keepAlive : ?(Nat, () -> Int);
   };
 
   /// Type of `StableData` for `share`/`unshare` function.
@@ -58,7 +58,6 @@ module {
   public class StreamSender<Q, S>(
     sendFunc : (x : Types.ChunkMessage<S>) -> async* Types.ControlMessage,
     counterCreator : () -> { accept(item : Q) : ?S },
-    settings : ?SettingsArg,
   ) {
     public var callbacks : Callbacks = {
       onNoSend = func(_) {};
@@ -70,14 +69,12 @@ module {
 
     let buffer = SWB.SlidingWindowBuffer<Q>();
 
-    let settings_ = {
-      var maxQueueSize = Option.chain<SettingsArg, Nat>(settings, func(s) = s.maxQueueSize);
-      var keepAlive = Option.chain<SettingsArg, (Nat, () -> Int)>(settings, func(s) = s.keepAlive);
-      var windowSize : Nat = Option.get(
-        Option.chain<SettingsArg, Nat>(settings, func(s) = s.windowSize),
-        MAX_CONCURRENT_CHUNKS_DEFAULT,
-      );
+    let settings_ : Settings = {
+      var maxQueueSize = null;
+      var keepAlive = null;
+      var windowSize = MAX_CONCURRENT_CHUNKS_DEFAULT
     };
+
     public func maxQueueSize() : ?Nat = settings_.maxQueueSize;
     public func windowSize() : Nat = settings_.windowSize;
     public func keepAliveTime() : ?Nat = Option.map<(Nat, () -> Int), Nat>(settings_.keepAlive, func(x) = x.0);

@@ -38,7 +38,6 @@ actor class Sender(receiverId : Principal) = self {
   let sender = Stream.StreamSender<Text, ?Text>(
     func(x : ChunkMessage) : async* ControlMessage { await receiver.receive(x) },
     counter,
-    null,
   );
 
   sender.setKeepAlive(?(10 ** 15, Time.now));

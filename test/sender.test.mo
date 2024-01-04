@@ -24,7 +24,6 @@ do {
   let sender = StreamSender.StreamSender<Text, ?Text>(
     send,
     Base.create(5),
-    null,
   );
 
   for (i in Iter.range(0, N - 1)) {
@@ -54,7 +53,6 @@ do {
   let sender = StreamSender.StreamSender<Text, ?Text>(
     send,
     Base.create(6),
-    null,
   );
 
   for (i in Iter.range(0, N - 1)) {
@@ -78,7 +76,6 @@ do {
   let sender = StreamSender.StreamSender<Text, ?Text>(
     send,
     Base.create(5),
-    null,
   );
   Result.assertOk(sender.push("abc"));
   await* sender.sendChunk();
@@ -94,7 +91,6 @@ do {
   let sender = StreamSender.StreamSender<Text, ?Text>(
     send,
     Base.create(5),
-    null,
   );
   Result.assertOk(sender.push("abc"));
   assert sender.status() == #ready;
