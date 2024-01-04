@@ -1,10 +1,10 @@
+import Stream "../../../src/StreamReceiver";
+import Tracker "../../../src/Tracker";
 import Int "mo:base/Int";
 import Text "mo:base/Text";
 import Time "mo:base/Time";
 import PT "mo:promtracker";
-import Stream "../../../src/StreamReceiver";
 import HTTP "http";
-import Tracker "tracker";
 
 actor class Receiver() = self {
   type ControlMessage = Stream.ControlMessage;

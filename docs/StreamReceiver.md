@@ -22,28 +22,42 @@ type StableData = (Nat, Int, Bool)
 Type of `StableData` for `share`/`unshare` function.
 Stream length, last chunk received timestamp, stopped flag.
 
+## Type `Callbacks`
+``` motoko no-repl
+type Callbacks = { var onChunk : (Types.ChunkMessageInfo, ControlMessage) -> () }
+```
+
+Callbacks called during processing chunk.
+
 ## Class `StreamReceiver<T>`
 
 ``` motoko no-repl
-class StreamReceiver<T>(startPos : Nat, timeoutArg : ?(Nat, () -> Int), itemCallback : (pos : Nat, item : T) -> ())
+class StreamReceiver<T>(itemCallback : (pos : Nat, item : T) -> (), timeoutArg : ?(Nat, () -> Int))
 ```
 
-StreamReceiver  
+StreamReceiver
 * receives chunk by `onChunk` call
 * validates `start` position in ChunkMessage (must match internal `length` variable)
 * calls `itemCallback` for each item of the chunk.
 
-Constructor arguments:  
-* `startPos` is starting length
-* `timeout` is maximum waiting time between onChunk calls (default = infinite)
+Constructor arguments:
 * `itemCallback` function
+* `timeout` is maximum waiting time between onChunk calls (default = infinite)
+
+### Value `callbacks`
+``` motoko no-repl
+let callbacks : Callbacks
+```
+
+Callbacks called during processing chunk.
+
 
 ### Function `share`
 ``` motoko no-repl
 func share() : StableData
 ```
 
-Share data in order to store in stable varible. No validation is performed.
+Share data in order to store in stable variable. No validation is performed.
 
 
 ### Function `unshare`
@@ -51,7 +65,7 @@ Share data in order to store in stable varible. No validation is performed.
 func unshare(data : StableData)
 ```
 
-Unhare data in order to store in stable varible. No validation is performed.
+Unhare data in order to store in stable variable. No validation is performed.
 
 
 ### Function `onChunk`

@@ -5,17 +5,18 @@ import Option "mo:base/Option";
 import PT "mo:promtracker";
 import Time "mo:base/Time";
 
-import StreamReceiver "../../../src/StreamReceiver";
-import StreamSender "../../../src/StreamSender";
-import Types "../../../src/types";
+import StreamReceiver "StreamReceiver";
+import StreamSender "StreamSender";
+import Types "types";
 
+/// See use example in examples/promtracker.
 module {
-
-  type ReceiverInterface = {
+  public type ReceiverInterface = {
     length : () -> Nat;
-    var callbacks : StreamReceiver.Callbacks;
+    callbacks : StreamReceiver.Callbacks;
   };
 
+  /// Receiver tracker.
   public class Receiver(metrics : PT.PromTracker, labels : Text, stable_ : Bool) {
     var receiver_ : ?ReceiverInterface = null;
     var previousTime : Nat = 0;
@@ -41,9 +42,7 @@ module {
 
     public func init(receiver : ReceiverInterface) {
       receiver_ := ?receiver;
-      receiver.callbacks := {
-        onChunk = onChunk;
-      };
+      receiver.callbacks.onChunk := onChunk;
       streamReceiverLength := ?metrics.addPullValue("stream_receiver_length", labels, receiver.length);
     };
 
@@ -68,7 +67,6 @@ module {
     };
 
     public func onChunk(info : Types.ChunkMessageInfo, ret : Types.ControlMessage) {
-      //let ?r = receiver_ else return;
       let (pos, msg) = info;
       switch (msg, ret) {
         case (#chunk size, #ok) {
@@ -94,10 +92,9 @@ module {
       };
       previousTime := now;
     };
-
   };
 
-  type SenderInterface = {
+  public type SenderInterface = {
     busyLevel : () -> Nat;
     isPaused : () -> Bool;
     isStopped : () -> Bool;
@@ -108,9 +105,10 @@ module {
     length : () -> Nat;
     lastChunkSent : () -> Int;
     windowSize : () -> Nat;
-    var callbacks : StreamSender.Callbacks;
+    callbacks : StreamSender.Callbacks;
   };
 
+  /// Sender tracker.
   public class Sender(metrics : PT.PromTracker, labels : Text, stable_ : Bool) {
     var sender_ : ?SenderInterface = null;
 
@@ -144,13 +142,11 @@ module {
 
     public func init(sender : SenderInterface) {
       sender_ := ?sender;
-      sender.callbacks := {
-        onSend = onSend;
-        onNoSend = onNoSend;
-        onError = onError;
-        onResponse = onResponse;
-        onRestart = onRestart;
-      };
+      sender.callbacks.onSend := onSend;
+      sender.callbacks.onNoSend := onNoSend;
+      sender.callbacks.onError := onError;
+      sender.callbacks.onResponse := onResponse;
+      sender.callbacks.onRestart := onRestart;
 
       sent := ?metrics.addPullValue("stream_sender_sent", labels, sender.sent);
       received := ?metrics.addPullValue("stream_sender_received", labels, sender.received);
@@ -205,7 +201,10 @@ module {
       };
     };
 
-    public func onNoSend() { skips.add(1) };
+    public func onNoSend() {
+      skips.add(1);
+    };
+
     public func onError(e : Error.Error) {
       let rejectCode = switch (Error.code(e)) {
         case (#call_error _) 0;
@@ -218,6 +217,7 @@ module {
       };
       chunkErrorType.update(rejectCode);
     };
+
     public func onResponse(res : { #ok; #gap; #stop; #error }) {
       switch (res) {
         case (#ok) oks.add(1);
@@ -233,10 +233,10 @@ module {
         lastStopPos.set(s.sent());
       };
     };
+
     public func onRestart() {
       let ?s = sender_ else return;
       lastRestartPos.set(s.sent());
     };
-
   };
 };
