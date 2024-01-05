@@ -1,4 +1,5 @@
 import Array "mo:base/Array";
+import Buffer "mo:base/Buffer";
 import Error "mo:base/Error";
 import Int "mo:base/Int";
 import Option "mo:base/Option";
@@ -38,12 +39,12 @@ module {
     public let lastRestartPos = metrics.addCounter("stream_receiver_last_restart_pos", labels, stable_);
     public let timeSinceLastChunk = metrics.addGauge("stream_receiver_time_since_last_chunk", labels, #both, [], stable_);
 
-    public var streamReceiverLength : ?PT.PullValue = null;
+    var pullValues : Buffer.Buffer<{ remove : () -> () }> = Buffer.Buffer<{ remove : () -> () }>(1);
 
     public func init(receiver : ReceiverInterface) {
       receiver_ := ?receiver;
       receiver.callbacks.onChunk := onChunk;
-      streamReceiverLength := ?metrics.addPullValue("stream_receiver_length", labels, receiver.length);
+      pullValues.add(metrics.addPullValue("stream_receiver_length", labels, receiver.length));
     };
 
     public func dispose() {
@@ -58,12 +59,10 @@ module {
       lastStopPos.remove();
       lastRestartPos.remove();
       timeSinceLastChunk.remove();
-      switch (streamReceiverLength) {
-        case (?s) {
-          s.remove();
-        };
-        case (_) {};
+      for (v in pullValues.vals()) {
+        v.remove();
       };
+      pullValues.clear();
     };
 
     public func onChunk(info : Types.ChunkMessageInfo, ret : Types.ControlMessage) {
@@ -133,12 +132,7 @@ module {
     // on error
     public let chunkErrorType = metrics.addGauge("stream_sender_chunk_error_type", labels, #none, [0, 1, 2, 3, 4, 5, 6], stable_);
 
-    public var sent : ?PT.PullValue = null;
-    public var received : ?PT.PullValue = null;
-    public var length : ?PT.PullValue = null;
-    public var lastChunkSent : ?PT.PullValue = null;
-    public var shutdown : ?PT.PullValue = null;
-    public var windowSizeSetting : ?PT.PullValue = null;
+    var pullValues : Buffer.Buffer<{ remove : () -> () }> = Buffer.Buffer<{ remove : () -> () }>(6);
 
     public func init(sender : SenderInterface) {
       sender_ := ?sender;
@@ -148,12 +142,12 @@ module {
       sender.callbacks.onResponse := onResponse;
       sender.callbacks.onRestart := onRestart;
 
-      sent := ?metrics.addPullValue("stream_sender_sent", labels, sender.sent);
-      received := ?metrics.addPullValue("stream_sender_received", labels, sender.received);
-      length := ?metrics.addPullValue("stream_sender_length", labels, sender.length);
-      lastChunkSent := ?metrics.addPullValue("stream_sender_last_chunk_sent", labels, func() : Nat { Int.abs(sender.lastChunkSent()) / 10 ** 9 });
-      shutdown := ?metrics.addPullValue("stream_sender_shutdown", labels, func() = if (sender.isShutdown()) 1 else 0);
-      windowSizeSetting := ?metrics.addPullValue("stream_sender_setting_window_size", labels, sender.windowSize);
+      pullValues.add(metrics.addPullValue("stream_sender_sent", labels, sender.sent));
+      pullValues.add(metrics.addPullValue("stream_sender_received", labels, sender.received));
+      pullValues.add(metrics.addPullValue("stream_sender_length", labels, sender.length));
+      pullValues.add(metrics.addPullValue("stream_sender_last_chunk_sent", labels, func() : Nat { Int.abs(sender.lastChunkSent()) / 10 ** 9 }));
+      pullValues.add(metrics.addPullValue("stream_sender_shutdown", labels, func() = if (sender.isShutdown()) 1 else 0));
+      pullValues.add(metrics.addPullValue("stream_sender_setting_window_size", labels, sender.windowSize));
     };
 
     public func dispose() {
@@ -172,17 +166,10 @@ module {
       lastStopPos.remove();
       lastRestartPos.remove();
       chunkErrorType.remove();
-      switch (sent, received, length, lastChunkSent, shutdown, windowSizeSetting) {
-        case (?s1, ?s2, ?s3, ?s4, ?s5, ?s6) {
-          s1.remove();
-          s2.remove();
-          s3.remove();
-          s4.remove();
-          s5.remove();
-          s6.remove();
-        };
-        case (_) {};
+      for (v in pullValues.vals()) {
+        v.remove();
       };
+      pullValues.clear();
     };
 
     public func onSend(c : Types.ChunkInfo) {
