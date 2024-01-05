@@ -19,7 +19,7 @@ actor class Receiver() = self {
   );
 
   let metrics = PT.PromTracker("", 65);
-  let tracker = Tracker.Receiver(metrics, false);
+  let tracker = Tracker.Receiver(metrics, "", false);
   tracker.init(receiver);
 
   public shared func receive(c : ChunkMessage) : async ControlMessage {

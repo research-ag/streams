@@ -1,9 +1,11 @@
 import Array "mo:base/Array";
+import Buffer "mo:base/Buffer";
 import Error "mo:base/Error";
 import Int "mo:base/Int";
 import Option "mo:base/Option";
-import Time "mo:base/Time";
 import PT "mo:promtracker";
+import Time "mo:base/Time";
+
 import StreamReceiver "StreamReceiver";
 import StreamSender "StreamSender";
 import Types "types";
@@ -16,31 +18,51 @@ module {
   };
 
   /// Receiver tracker.
-  public class Receiver(metrics : PT.PromTracker, stable_ : Bool) {
+  public class Receiver(metrics : PT.PromTracker, labels : Text, stable_ : Bool) {
     var receiver_ : ?ReceiverInterface = null;
     var previousTime : Nat = 0;
 
     // gauges
-    let chunkSize = metrics.addGauge("chunk_size", "", #both, Array.tabulate<Nat>(8, func(i) = 8 ** i), stable_);
-    let stopFlag = metrics.addGauge("stop_flag", "", #both, [], stable_);
+    public let chunkSize = metrics.addGauge("stream_receiver_chunk_size", labels, #both, Array.tabulate<Nat>(8, func(i) = 8 ** i), stable_);
+    public let stopFlag = metrics.addGauge("stream_receiver_stop_flag", labels, #both, [], stable_);
 
     // pulls
-    ignore metrics.addPullValue("last_chunk_received", "", func() = previousTime);
+    public let lastChunkReceived = metrics.addPullValue("stream_receiver_last_chunk_received", labels, func() = previousTime);
 
     // counters
-    let chunksOk = metrics.addCounter("total_chunks_ok", "", stable_);
-    let pingsOk = metrics.addCounter("total_pings_ok", "", stable_);
-    let gaps = metrics.addCounter("total_gaps", "", stable_);
-    let stops = metrics.addCounter("total_stops", "", stable_);
-    let restarts = metrics.addCounter("total_restarts", "", stable_);
-    let lastStopPos = metrics.addCounter("last_stop_pos", "", stable_);
-    let lastRestartPos = metrics.addCounter("last_restart_pos", "", stable_);
-    let timeSinceLastChunk = metrics.addGauge("time_since_last_chunk", "", #both, [], stable_);
+    public let chunksOk = metrics.addCounter("stream_receiver_total_chunks_ok", labels, stable_);
+    public let pingsOk = metrics.addCounter("stream_receiver_total_pings_ok", labels, stable_);
+    public let gaps = metrics.addCounter("stream_receiver_total_gaps", labels, stable_);
+    public let stops = metrics.addCounter("stream_receiver_total_stops", labels, stable_);
+    public let restarts = metrics.addCounter("stream_receiver_total_restarts", labels, stable_);
+    public let lastStopPos = metrics.addCounter("stream_receiver_last_stop_pos", labels, stable_);
+    public let lastRestartPos = metrics.addCounter("stream_receiver_last_restart_pos", labels, stable_);
+    public let timeSinceLastChunk = metrics.addGauge("stream_receiver_time_since_last_chunk", labels, #both, [], stable_);
+
+    var pullValues : Buffer.Buffer<{ remove : () -> () }> = Buffer.Buffer<{ remove : () -> () }>(1);
 
     public func init(receiver : ReceiverInterface) {
       receiver_ := ?receiver;
       receiver.callbacks.onChunk := onChunk;
-      ignore metrics.addPullValue("length", "", receiver.length);
+      pullValues.add(metrics.addPullValue("stream_receiver_length", labels, receiver.length));
+    };
+
+    public func dispose() {
+      chunkSize.remove();
+      stopFlag.remove();
+      lastChunkReceived.remove();
+      chunksOk.remove();
+      pingsOk.remove();
+      gaps.remove();
+      stops.remove();
+      restarts.remove();
+      lastStopPos.remove();
+      lastRestartPos.remove();
+      timeSinceLastChunk.remove();
+      for (v in pullValues.vals()) {
+        v.remove();
+      };
+      pullValues.clear();
     };
 
     public func onChunk(info : Types.ChunkMessageInfo, ret : Types.ControlMessage) {
@@ -86,29 +108,31 @@ module {
   };
 
   /// Sender tracker.
-  public class Sender(metrics : PT.PromTracker, stable_ : Bool) {
+  public class Sender(metrics : PT.PromTracker, labels : Text, stable_ : Bool) {
     var sender_ : ?SenderInterface = null;
 
     // on send
-    let busyLevel = metrics.addGauge("window_size", "", #both, [], stable_);
-    let queueSizePreBatch = metrics.addGauge("queue_size_pre_batch", "", #both, [], stable_);
-    let queueSizePostBatch = metrics.addGauge("queue_size_post_batch", "", #both, [], stable_);
-    let chunkSize = metrics.addGauge("chunk_size", "", #both, Array.tabulate<Nat>(8, func(i) = 8 ** i), stable_);
-    let pings = metrics.addCounter("total_pings", "", stable_);
-    let skips = metrics.addCounter("total_skips", "", stable_);
+    public let busyLevel = metrics.addGauge("stream_sender_window_size", labels, #both, [], stable_);
+    public let queueSizePreBatch = metrics.addGauge("stream_sender_queue_size_pre_batch", labels, #both, [], stable_);
+    public let queueSizePostBatch = metrics.addGauge("stream_sender_queue_size_post_batch", labels, #both, [], stable_);
+    public let chunkSize = metrics.addGauge("stream_sender_chunk_size", labels, #both, Array.tabulate<Nat>(8, func(i) = 8 ** i), stable_);
+    public let pings = metrics.addCounter("stream_sender_total_pings", labels, stable_);
+    public let skips = metrics.addCounter("stream_sender_total_skips", labels, stable_);
 
     // on response
-    let oks = metrics.addCounter("total_oks", "", stable_);
-    let gaps = metrics.addCounter("total_gaps", "", stable_);
-    let stops = metrics.addCounter("total_stops", "", stable_);
-    let errors = metrics.addCounter("total_errors", "", stable_);
-    let stopFlag = metrics.addGauge("stop_flag", "", #both, [], stable_);
-    let pausedFlag = metrics.addGauge("paused_flag", "", #both, [], stable_);
-    let lastStopPos = metrics.addCounter("last_stop_pos", "", stable_);
-    let lastRestartPos = metrics.addCounter("last_restart_pos", "", stable_);
+    public let oks = metrics.addCounter("stream_sender_total_oks", labels, stable_);
+    public let gaps = metrics.addCounter("stream_sender_total_gaps", labels, stable_);
+    public let stops = metrics.addCounter("stream_sender_total_stops", labels, stable_);
+    public let errors = metrics.addCounter("stream_sender_total_errors", labels, stable_);
+    public let stopFlag = metrics.addGauge("stream_sender_stop_flag", labels, #both, [], stable_);
+    public let pausedFlag = metrics.addGauge("stream_sender_paused_flag", labels, #both, [], stable_);
+    public let lastStopPos = metrics.addCounter("stream_sender_last_stop_pos", labels, stable_);
+    public let lastRestartPos = metrics.addCounter("stream_sender_last_restart_pos", labels, stable_);
 
     // on error
-    let chunkErrorType = metrics.addGauge("chunk_error_type", "", #none, [0, 1, 2, 3, 4, 5, 6], stable_);
+    public let chunkErrorType = metrics.addGauge("stream_sender_chunk_error_type", labels, #none, [0, 1, 2, 3, 4, 5, 6], stable_);
+
+    var pullValues : Buffer.Buffer<{ remove : () -> () }> = Buffer.Buffer<{ remove : () -> () }>(6);
 
     public func init(sender : SenderInterface) {
       sender_ := ?sender;
@@ -118,12 +142,34 @@ module {
       sender.callbacks.onResponse := onResponse;
       sender.callbacks.onRestart := onRestart;
 
-      ignore metrics.addPullValue("sent", "", sender.sent);
-      ignore metrics.addPullValue("received", "", sender.received);
-      ignore metrics.addPullValue("length", "", sender.length);
-      ignore metrics.addPullValue("last_chunk_sent", "", func() : Nat { Int.abs(sender.lastChunkSent()) / 10 ** 9 });
-      ignore metrics.addPullValue("shutdown", "", func() = if (sender.isShutdown()) 1 else 0);
-      ignore metrics.addPullValue("setting_window_size", "", sender.windowSize);
+      pullValues.add(metrics.addPullValue("stream_sender_sent", labels, sender.sent));
+      pullValues.add(metrics.addPullValue("stream_sender_received", labels, sender.received));
+      pullValues.add(metrics.addPullValue("stream_sender_length", labels, sender.length));
+      pullValues.add(metrics.addPullValue("stream_sender_last_chunk_sent", labels, func() : Nat { Int.abs(sender.lastChunkSent()) / 10 ** 9 }));
+      pullValues.add(metrics.addPullValue("stream_sender_shutdown", labels, func() = if (sender.isShutdown()) 1 else 0));
+      pullValues.add(metrics.addPullValue("stream_sender_setting_window_size", labels, sender.windowSize));
+    };
+
+    public func dispose() {
+      busyLevel.remove();
+      queueSizePreBatch.remove();
+      queueSizePostBatch.remove();
+      chunkSize.remove();
+      pings.remove();
+      skips.remove();
+      oks.remove();
+      gaps.remove();
+      stops.remove();
+      errors.remove();
+      stopFlag.remove();
+      pausedFlag.remove();
+      lastStopPos.remove();
+      lastRestartPos.remove();
+      chunkErrorType.remove();
+      for (v in pullValues.vals()) {
+        v.remove();
+      };
+      pullValues.clear();
     };
 
     public func onSend(c : Types.ChunkInfo) {
@@ -167,6 +213,7 @@ module {
         case (#error) errors.add(1);
       };
       let ?s = sender_ else return;
+      busyLevel.update(s.busyLevel());
       stopFlag.update(if (s.isStopped()) 1 else 0);
       pausedFlag.update(if (s.isPaused()) 1 else 0);
       if (s.isStopped()) {
