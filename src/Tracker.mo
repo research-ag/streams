@@ -3,6 +3,7 @@ import Buffer "mo:base/Buffer";
 import Error "mo:base/Error";
 import Int "mo:base/Int";
 import Option "mo:base/Option";
+import Prim "mo:prim";
 import PT "mo:promtracker";
 import Time "mo:base/Time";
 
@@ -85,7 +86,7 @@ module {
           lastStopPos.set(pos);
         };
       };
-      let now = Int.abs(Time.now()) / 10 ** 6;
+      let now = Prim.nat64ToNat(Prim.time() / 10 ** 6);
       if (ret != #gap and msg != #restart and previousTime != 0) {
         timeSinceLastChunk.update(now - previousTime);
       };
