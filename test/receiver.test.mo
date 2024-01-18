@@ -4,9 +4,10 @@ import StreamReceiver "../src/StreamReceiver";
 // test index counter and gap detection
 do {
   var size = 0;
-  func process(index : Nat, item : Text) {
+  func process(index : Nat, item : Text) : Bool {
     assert size == index;
     size += 1;
+    true;
   };
 
   let receiver = StreamReceiver.StreamReceiver<Text>(process, null);
@@ -26,9 +27,10 @@ do {
 // test timeout detection
 do {
   var size = 0;
-  func process(index : Nat, item : Text) {
+  func process(index : Nat, item : Text) : Bool {
     assert size == index;
     size += 1;
+    true;
   };
 
   var time = 0;

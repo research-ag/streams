@@ -26,7 +26,7 @@ module {
   /// * `itemCallback` function
   /// * `timeout` is maximum waiting time between onChunk calls (default = infinite)
   public class StreamReceiver<T>(
-    itemCallback : (pos : Nat, item : T) -> (),
+    itemCallback : (pos : Nat, item : T) -> (Bool),
     timeoutArg : ?(Nat, () -> Int),
   ) {
     /// Callbacks called during processing chunk.
@@ -104,9 +104,16 @@ module {
         };
         case (null) {};
       };
-      for (i in ch.keys()) itemCallback(start + i, ch[i]);
-      length_ += ch.size();
-      return #ok;
+      var i = 0;
+      label w while (i < ch.size()) {
+        if (not itemCallback(start + i, ch[i])) break w;
+        i += 1;
+      };
+      length_ += i;
+      if (i == ch.size()) #ok else #stop i;
+//      for (i in ch.keys()) itemCallback(start + i, ch[i]);
+//      length_ += ch.size();
+//      return #ok;
     };
 
     /// Manually stop the receiver.

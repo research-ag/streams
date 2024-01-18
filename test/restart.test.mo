@@ -24,6 +24,7 @@ func createReceiver() : Receiver<?Text> {
     func(pos : Nat, item : ?Text) {
       assert pos == received.size();
       received.add(item);
+      true;
     },
     null,
   );

@@ -16,7 +16,7 @@ type ControlMessage = Types.ControlMessage;
 actor B {
   // processor of received items
   let received = Buffer.Buffer<Text>(0);
-  func processItem(i : Nat, item : ?Text) {
+  func processItem(i : Nat, item : ?Text) : Bool {
     let prefix = ".   B   item " # Nat.toText(i) # ": ";
     switch (item) {
       case (null) Debug.print(prefix # "null");
@@ -25,6 +25,7 @@ actor B {
         received.add(x);
       };
     };
+    true;
   };
 
   // StreamReceiver
@@ -60,7 +61,7 @@ actor B {
     };
     switch (res) {
       case (#ok) str #= "#ok";
-      case (#gap) str #= "#gap"; 
+      case (#gap) str #= "#gap";
       case (#stop _) str #= "#stop";
     };
     Debug.print(str);
@@ -155,7 +156,10 @@ actor A {
 
   let sender = StreamSender.StreamSender<Text, ?Text>(sendToReceiver, counter);
 
-  public func submit(item : Text) : async { #err : { #NoSpace; #LimitExceeded }; #ok : Nat } {
+  public func submit(item : Text) : async {
+    #err : { #NoSpace; #LimitExceeded };
+    #ok : Nat;
+  } {
     let res = sender.push(item);
     var str = "A submit: ";
     switch (res) {
@@ -176,13 +180,10 @@ actor A {
   };
 
   public query func isState(l : [Nat]) : async Bool {
-    Debug.print("A isState: " # debug_show(l));
-    sender.length() == l[0] and
-    sender.sent() == l[1] and
-    sender.received() == l[2] and
-    sender.busyLevel() == l[3];
+    Debug.print("A isState: " # debug_show (l));
+    sender.length() == l[0] and sender.sent() == l[1] and sender.received() == l[2] and sender.busyLevel() == l[3];
   };
-  
+
   public query func isShutdown() : async Bool {
     sender.isShutdown();
   };
@@ -196,28 +197,28 @@ assert ((await A.submit("m2xxx")) == #ok 2);
 assert ((await A.submit("m3-long")) == #ok 3);
 assert ((await A.submit("m4-long")) == #ok 4);
 assert ((await A.submit("m5")) == #ok 5);
-assert await A.isState([6,0,0,0]);
+assert await A.isState([6, 0, 0, 0]);
 assert ((await B.nReceived()) == 0);
 ignore A.trigger(); // chunk m0, m1
-assert await A.isState([6,2,0,1]); // chunk was sent 
-assert await A.isState([6,2,2,0]); // chunk has returned ok
+assert await A.isState([6, 2, 0, 1]); // chunk was sent
+assert await A.isState([6, 2, 2, 0]); // chunk has returned ok
 assert ((await B.nReceived()) == 2);
 await B.setFailMode(#reject, 0);
 ignore A.trigger(); // chunk m2,null,null will fail
-assert await A.isState([6,5,2,1]); // chunk was sent 
-assert await A.isState([6,2,2,0]); // chunk has returned rejected
+assert await A.isState([6, 5, 2, 1]); // chunk was sent
+assert await A.isState([6, 2, 2, 0]); // chunk has returned rejected
 ignore A.trigger(); // chunk m2,null,null will fail
-assert await A.isState([6,5,2,1]); // chunk was sent 
-assert await A.isState([6,2,2,0]); // chunk has returned rejected
+assert await A.isState([6, 5, 2, 1]); // chunk was sent
+assert await A.isState([6, 2, 2, 0]); // chunk has returned rejected
 assert ((await B.nReceived()) == 2);
 await B.setFailMode(#off, 0);
 ignore A.trigger(); // chunk m2,null,null will succeed
-assert await A.isState([6,5,2,1]); // chunk was sent 
-assert await A.isState([6,5,5,0]); // chunk has returned ok
+assert await A.isState([6, 5, 2, 1]); // chunk was sent
+assert await A.isState([6, 5, 5, 0]); // chunk has returned ok
 assert ((await B.nReceived()) == 3);
 ignore A.trigger(); // chunk m5
-assert await A.isState([6,6,5,1]); // chunk was sent 
-assert await A.isState([6,6,6,0]); // chunk has returned ok
+assert await A.isState([6, 6, 5, 1]); // chunk was sent
+assert await A.isState([6, 6, 6, 0]); // chunk has returned ok
 assert ((await B.nReceived()) == 4);
 await A.trigger(); // no items left
 assert ((await B.nReceived()) == 4);
@@ -231,14 +232,14 @@ assert (list[3] == "m5");
 Debug.print("=== Part 2 ===");
 assert ((await A.submit("m6xxx")) == #ok 6);
 assert ((await A.submit("m7xxx")) == #ok 7);
-assert await A.isState([8,6,6,0]);
+assert await A.isState([8, 6, 6, 0]);
 ignore A.trigger();
-let a1 = A.isState([8,7,6,1]);
+let a1 = A.isState([8, 7, 6, 1]);
 ignore A.trigger();
-let a2 = A.isState([8,8,6,2]);
+let a2 = A.isState([8, 8, 6, 2]);
 await async {};
 // here the two chunks have returned with ok
-let a3 = A.isState([8,8,8,0]);
+let a3 = A.isState([8, 8, 8, 0]);
 await async {};
 assert await a1;
 assert await a2;
@@ -250,22 +251,22 @@ assert ((await A.submit("m8")) == #ok 8);
 assert ((await A.submit("m9")) == #ok 9);
 assert ((await A.submit("mA")) == #ok 10);
 assert ((await A.submit("mB")) == #ok 11);
-assert await A.isState([12,8,8,0]);
+assert await A.isState([12, 8, 8, 0]);
 ignore B.setFailMode(#reject, 0);
 ignore A.trigger();
-let b1 = A.isState([12,10,8,1]);
+let b1 = A.isState([12, 10, 8, 1]);
 ignore B.setFailMode(#off, 1);
 ignore A.trigger();
-let b2 = A.isState([12,12,8,2]);
+let b2 = A.isState([12, 12, 8, 2]);
 await async {};
 // here the two chunks have returned with rejects
-let b3 = A.isState([12,8,8,0]);
+let b3 = A.isState([12, 8, 8, 0]);
 assert await b1;
 assert await b2;
 assert await b3;
 ignore A.trigger();
 ignore A.trigger();
 await async {};
-assert await A.isState([12,12,12,0]);
- 
+assert await A.isState([12, 12, 12, 0]);
+
 assert not (await A.isShutdown());
