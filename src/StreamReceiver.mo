@@ -34,6 +34,13 @@ module {
       var onChunk = func(_) {};
     };
 
+    var maxLength : ?Nat = null;
+
+    /// Set max stream length
+    public func setMaxLength(length : ?Nat) {
+      maxLength := length;
+    };
+
     var stopped_ = false;
     var length_ = 0;
     var lastChunkReceived_ : Int = 0;
@@ -91,6 +98,12 @@ module {
         };
       };
       let #chunk ch = msg else return #ok;
+      switch (maxLength) {
+        case (?l) {
+          if (ch.size() + length_ > l) return #stop;
+        };
+        case (null) {};
+      };
       for (i in ch.keys()) itemCallback(start + i, ch[i]);
       length_ += ch.size();
       return #ok;
