@@ -155,12 +155,12 @@ actor A {
 
   let sender = StreamSender.StreamSender<Text, ?Text>(sendToReceiver, counter);
 
-  public func submit(item : Text) : async { #err : { #NoSpace }; #ok : Nat } {
+  public func submit(item : Text) : async { #err : { #NoSpace; #LimitExceeded }; #ok : Nat } {
     let res = sender.push(item);
     var str = "A submit: ";
     switch (res) {
       case (#ok i) str #= Nat.toText(i);
-      case (#err e) str #= "NoSpace";
+      case (#err e) str #= "Error";
     };
     Debug.print(str);
     res;

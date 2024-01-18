@@ -22,6 +22,7 @@ module {
   /// Settings of `StreamSender`.
   public type Settings = {
     var maxQueueSize : ?Nat;
+    var maxTotalQueueSize : ?Nat;
     var windowSize : Nat;
     var keepAlive : ?(Nat, () -> Int);
   };
@@ -34,6 +35,7 @@ module {
     lastChunkSent : Int;
     shutdown : Bool;
   };
+
   public type Callbacks = {
     onNoSend : () -> ();
     onSend : Types.ChunkInfo -> ();
@@ -71,12 +73,17 @@ module {
 
     let settings_ : Settings = {
       var maxQueueSize = null;
+      var maxTotalQueueSize = null;
       var keepAlive = null;
-      var windowSize = MAX_CONCURRENT_CHUNKS_DEFAULT
+      var windowSize = MAX_CONCURRENT_CHUNKS_DEFAULT;
     };
 
     public func maxQueueSize() : ?Nat = settings_.maxQueueSize;
+
+    public func maxTotalQueueSize() : ?Nat = settings_.maxTotalQueueSize;
+
     public func windowSize() : Nat = settings_.windowSize;
+
     public func keepAliveTime() : ?Nat = Option.map<(Nat, () -> Int), Nat>(settings_.keepAlive, func(x) = x.0);
 
     var stopped = false;
@@ -114,9 +121,15 @@ module {
       buffer.len() >= maxQueueSize;
     };
 
+    func queueTotalExceeded() : Bool {
+      let ?maxTotalQueueSize = settings_.maxTotalQueueSize else return false;
+      buffer.end() >= maxTotalQueueSize;
+    };
+
     /// Add item to the `StreamSender`'s queue. Return number of succesfull `push` call, or error in case of lack of space.
-    public func push(item : Q) : Result.Result<Nat, { #NoSpace }> {
+    public func push(item : Q) : Result.Result<Nat, { #NoSpace; #LimitExceeded }> {
       if (queueFull()) return #err(#NoSpace);
+      if (queueTotalExceeded()) return #err(#LimitExceeded);
       return #ok(buffer.add item);
     };
 
@@ -281,6 +294,9 @@ module {
 
     /// Update max queue size.
     public func setMaxQueueSize(n : ?Nat) = settings_.maxQueueSize := n;
+
+    /// Update max total queue size.
+    public func setMaxTotalQueueSize(n : ?Nat) = settings_.maxTotalQueueSize := n;
 
     /// Update max amount of concurrent outgoing requests.
     public func setWindowSize(n : Nat) = settings_.windowSize := n;
