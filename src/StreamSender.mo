@@ -22,7 +22,7 @@ module {
   /// Settings of `StreamSender`.
   public type Settings = {
     var maxQueueSize : ?Nat;
-    var maxTotalQueueSize : ?Nat;
+    var maxStreamLength : ?Nat;
     var windowSize : Nat;
     var keepAlive : ?(Nat, () -> Int);
   };
@@ -68,7 +68,7 @@ module {
 
     let settings : Settings = {
       var maxQueueSize = null;
-      var maxTotalQueueSize = null;
+      var maxStreamLength = null;
       var keepAlive = null;
       var windowSize = MAX_CONCURRENT_CHUNKS_DEFAULT;
     };
@@ -110,15 +110,15 @@ module {
       buffer.len() >= maxQueueSize;
     };
 
-    func queueTotalExceeded() : Bool {
-      let ?maxTotalQueueSize = settings.maxTotalQueueSize else return false;
-      buffer.end() >= maxTotalQueueSize;
+    func streamLengthExceeded() : Bool {
+      let ?maxStreamLength = settings.maxStreamLength else return false;
+      buffer.end() >= maxStreamLength;
     };
 
     /// Add item to the `StreamSender`'s queue. Return number of succesfull `push` call, or error in case of lack of space.
     public func push(item : Q) : Result.Result<Nat, { #NoSpace; #LimitExceeded }> {
       if (queueFull()) return #err(#NoSpace);
-      if (queueTotalExceeded()) return #err(#LimitExceeded);
+      if (streamLengthExceeded()) return #err(#LimitExceeded);
       return #ok(buffer.add item);
     };
 
@@ -284,9 +284,9 @@ module {
     /// `maxQueueSize` is maximum number of elements, which can simultaneously be in `StreamSender`'s queue. Default value is infinity.
     public func maxQueueSize() : ?Nat = settings.maxQueueSize;
 
-    /// Get `maxTotalQueueSize` setting.
-    /// `maxTotalQueueSize` is maximum number of elements `StreamSender` can ever accept.
-    public func maxTotalQueueSize() : ?Nat = settings.maxTotalQueueSize;
+    /// Get `maxStreamLength` setting.
+    /// `maxStreamLength` is maximum number of elements `StreamSender` can ever accept.
+    public func maxStreamLength() : ?Nat = settings.maxStreamLength;
 
     /// Get `windowSize` setting.
     /// `windowSize` is maximum number of concurrent `sendChunk` calls. Default value is `MAX_CONCURRENT_CHUNKS_DEFAULT`.
@@ -302,8 +302,8 @@ module {
     public func setMaxQueueSize(n : ?Nat) = settings.maxQueueSize := n;
 
     /// Update max total queue size.
-    /// `maxTotalQueueSize` is maximum number of elements `StreamSender` can ever accept.
-    public func setMaxTotalQueueSize(n : ?Nat) = settings.maxTotalQueueSize := n;
+    /// `maxStreamLength` is maximum number of elements `StreamSender` can ever accept.
+    public func setMaxStreamLength(n : ?Nat) = settings.maxStreamLength := n;
 
     /// Update max amount of concurrent outgoing requests.
     /// `windowSize` is maximum number of concurrent `sendChunk` calls. Default value is `MAX_CONCURRENT_CHUNKS_DEFAULT`.
