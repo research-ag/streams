@@ -200,7 +200,7 @@ module {
       updateTime();
       concurrentChunks += 1;
 
-      callbacks.onSend(Types.info(chunkPayload));
+      callbacks.onSend(Types.chunkInfo(chunkPayload));
 
       let res = try {
         await* sendFunc((start, chunkPayload));
@@ -234,7 +234,7 @@ module {
       switch (res) {
         case (#ok) okTo := end;
         case (#gap) { retraceTo := start; retraceMoreLater := true };
-        case (#stop) { okTo := start; retraceTo := start };
+        case (#stop l) { okTo := start + l; retraceTo := start + l };
         case (#error) if (start != end) retraceTo := start;
       };
 
@@ -262,7 +262,10 @@ module {
       if (concurrentChunks == 0) paused := false;
 
       // stop stream
-      if (res == #stop) stopped := true;
+      switch (res) {
+        case (#stop _) stopped := true;
+        case (_) {};
+      };
 
       callbacks.onResponse(res);
     };

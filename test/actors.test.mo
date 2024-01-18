@@ -56,12 +56,12 @@ actor B {
         Debug.print(str # "reject");
         throw Error.reject("failMode");
       };
-      case (#stop) #stop;
+      case (#stop) #stop 0;
     };
     switch (res) {
       case (#ok) str #= "#ok";
       case (#gap) str #= "#gap"; 
-      case (#stop) str #= "#stop";
+      case (#stop _) str #= "#stop";
     };
     Debug.print(str);
     res;
@@ -137,7 +137,7 @@ actor A {
       switch (ret) {
         case (#ok) str #= "ok";
         case (#gap) str #= "gap";
-        case (#stop) str #= "stop";
+        case (#stop _) str #= "stop";
       };
       Debug.print(str);
       return ret;

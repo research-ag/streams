@@ -90,7 +90,7 @@ module {
       switch (msg) {
         case (#ping or #chunk _) {
           checkTimeAndStop();
-          if (stopped_) return #stop;
+          if (stopped_) return #stop 0;
         };
         case (#restart) {
           resetTimeout();
@@ -100,7 +100,7 @@ module {
       let #chunk ch = msg else return #ok;
       switch (maxLength) {
         case (?l) {
-          if (ch.size() + length_ > l) return #stop;
+          if (ch.size() + length_ > l) return #stop 0;
         };
         case (null) {};
       };

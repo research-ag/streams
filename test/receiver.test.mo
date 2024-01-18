@@ -48,5 +48,5 @@ do {
   assert receiver.lastChunkReceived() == 2;
 
   time := 4;
-  assert receiver.onChunk((2, #chunk(["abc"]))) == #stop;
+  assert receiver.onChunk((2, #chunk(["abc"]))) == #stop 0;
 };
