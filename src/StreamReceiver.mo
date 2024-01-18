@@ -1,3 +1,4 @@
+import Nat "mo:base/Nat";
 import SWB "mo:swb";
 import Types "types";
 
@@ -98,22 +99,17 @@ module {
         };
       };
       let #chunk ch = msg else return #ok;
-      switch (maxLength) {
-        case (?l) {
-          if (ch.size() + length_ > l) return #stop 0;
-        };
-        case (null) {};
+      let n = switch (maxLength) {
+        case (?max) Nat.min(max - length_, ch.size());
+        case (null) ch.size();
       };
       var i = 0;
-      label w while (i < ch.size()) {
+      label w while (i < n) {
         if (not itemCallback(start + i, ch[i])) break w;
         i += 1;
       };
       length_ += i;
       if (i == ch.size()) #ok else #stop i;
-//      for (i in ch.keys()) itemCallback(start + i, ch[i]);
-//      length_ += ch.size();
-//      return #ok;
     };
 
     /// Manually stop the receiver.
