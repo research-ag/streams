@@ -1,4 +1,5 @@
 import Stream "../../../src/StreamSender";
+import Tracker "../../../src/Tracker";
 import Principal "mo:base/Principal";
 import Result "mo:base/Result";
 import Debug "mo:base/Debug";
@@ -7,7 +8,6 @@ import Text "mo:base/Text";
 import Time "mo:base/Time";
 import PT "mo:promtracker";
 import HTTP "http";
-import Tracker "tracker";
 
 actor class Sender(receiverId : Principal) = self {
   type ControlMessage = Stream.ControlMessage;
@@ -33,7 +33,7 @@ actor class Sender(receiverId : Principal) = self {
   };
 
   let metrics = PT.PromTracker("", 65);
-  let tracker = Tracker.Sender(metrics, true);
+  let tracker = Tracker.Sender(metrics, "", true);
 
   let sender = Stream.StreamSender<Text, ?Text>(
     func(x : ChunkMessage) : async* ControlMessage { await receiver.receive(x) },
