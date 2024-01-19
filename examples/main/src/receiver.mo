@@ -9,9 +9,9 @@ actor Receiver {
   let received = Buffer.Buffer<?Text>(0);
 
   let receiver = Stream.StreamReceiver<?Text>(
-    func(index : Nat, item : ?Text) {
-      assert received.size() == index;
+    func(index : Nat, item : ?Text) : Bool {
       received.add(item);
+      received.size() == index + 1;
     },
     null,
   );

@@ -70,7 +70,7 @@ do {
 // #stop response
 do {
   func send(message : Types.ChunkMessage<?Text>) : async* Types.ControlMessage {
-    #stop;
+    #stop 0;
   };
 
   let sender = StreamSender.StreamSender<Text, ?Text>(

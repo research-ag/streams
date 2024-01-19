@@ -14,7 +14,7 @@ actor class Receiver() = self {
   public func lastReceived() : async ?Text { store };
 
   let receiver = Stream.StreamReceiver<?Text>(
-    func(_ : Nat, item : ?Text) = store := item,
+    func(_ : Nat, item : ?Text) : Bool { store := item; true },
     ?(10 ** 15, Time.now),
   );
 

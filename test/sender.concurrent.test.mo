@@ -11,10 +11,11 @@ import Random "mo:base/Random";
 import Option "mo:base/Option";
 import Base "sender.base";
 import StreamReceiver "../src/StreamReceiver";
+import Types "../src/types";
 // Note: A chunk response of #trap (aka canister_error) cannot be simulated with
 // the moc interpreter. Calling Debug.trap() to generate the error would
 // instantly terminate the whole test.
-type ChunkResponse = { #ok; #gap; #stop; #error };
+type ChunkResponse = Types.ControlMessage or { #error };
 
 class Chunk() {
   var response : ?ChunkResponse = null;
@@ -24,7 +25,7 @@ class Chunk() {
     switch (response) {
       case (? #ok) #ok;
       case (? #gap) #gap;
-      case (? #stop) #stop;
+      case (? #stop n) #stop n;
       case (? #error) throw Error.reject("");
       case (null) Debug.trap("cannot happen");
     };
@@ -54,7 +55,7 @@ class Sender(n : Nat) {
 
   let sender = StreamSender.StreamSender<Text, ?Text>(
     sendChunkMessage,
-    Base.create(1)
+    Base.create(1),
   );
   sender.setKeepAlive(?(1, func() = time));
 
@@ -147,7 +148,7 @@ func allCases(n : Nat) : async () {
   func getResponses(a_ : Nat32, b_ : Nat32, c : Nat) : ([(ChunkResponse, ChunkRequest)], Nat) {
     var time : Int = 0;
     let r = StreamReceiver.StreamReceiver<()>(
-      func(pos : Nat, item : ()) = (),
+      func(pos : Nat, item : ()) = true,
       ?(1, func() = time),
     );
     var x = 0;
@@ -260,7 +261,7 @@ do {
   let n = 100;
   let p = random_permutation(n);
   let s = Sender(n);
-  let r = StreamReceiver.StreamReceiver<()>(func(pos : Nat, item : ()) = (), null);
+  let r = StreamReceiver.StreamReceiver<()>(func(pos : Nat, item : ()) = true, null);
 
   s.setMaxN(n + 1);
   let chunk = Array.tabulate<Chunk>(n, func(i) = Chunk());
@@ -345,7 +346,7 @@ do {
     (#ok, #ready, 1, 1),
     (#gap, #shutdown, 0, 0),
     (#error, #ready, 0, 0),
-    (#stop, #stopped, 0, 0),
+    (#stop 0, #stopped, 0, 0),
   ];
   for (t in tests.vals()) {
     let (response, status, pos, sent) = t;
@@ -359,12 +360,12 @@ do {
     (#ok, #shutdown, 2, 0),
     (#gap, #stopped, 0, 0),
     (#error, #stopped, 0, 0),
-    (#stop, #shutdown, 1, 0),
+    (#stop 0, #shutdown, 1, 0),
   ];
   for (t in tests.vals()) {
     let (response, status, pos, sent) = t;
     await test([
-      (0, #stop, #stopped, 0, 0),
+      (0, #stop 0, #stopped, 0, 0),
       (1, response, status, pos, sent),
     ]);
   };
@@ -376,22 +377,22 @@ do {
     ([#ok, #ok], [(#ready, 1, 2), (#ready, 2, 2)]),
     ([#ok, #gap], [(#ready, 1, 2), (#shutdown, 1, 1)]),
     ([#ok, #error], [(#ready, 1, 2), (#ready, 1, 1)]),
-    ([#ok, #stop], [(#ready, 1, 2), (#stopped, 1, 1)]),
+    ([#ok, #stop 0], [(#ready, 1, 2), (#stopped, 1, 1)]),
 
     ([#gap, #ok], [(#shutdown, 0, 0), (#shutdown, 2, 0)]),
     ([#gap, #gap], [(#shutdown, 0, 0), (#shutdown, 0, 0)]),
     ([#gap, #error], [(#shutdown, 0, 0), (#shutdown, 0, 0)]),
-    ([#gap, #stop], [(#shutdown, 0, 0), (#shutdown, 1, 0)]),
+    ([#gap, #stop 0], [(#shutdown, 0, 0), (#shutdown, 1, 0)]),
 
     ([#error, #ok], [(#paused, 0, 0), (#shutdown, 2, 0)]),
     ([#error, #gap], [(#paused, 0, 0), (#ready, 0, 0)]),
     ([#error, #error], [(#paused, 0, 0), (#ready, 0, 0)]),
-    ([#error, #stop], [(#paused, 0, 0), (#shutdown, 1, 0)]),
+    ([#error, #stop 0], [(#paused, 0, 0), (#shutdown, 1, 0)]),
 
-    ([#stop, #ok], [(#stopped, 0, 0), (#shutdown, 2, 0)]),
-    ([#stop, #gap], [(#stopped, 0, 0), (#stopped, 0, 0)]),
-    ([#stop, #error], [(#stopped, 0, 0), (#stopped, 0, 0)]),
-    ([#stop, #stop], [(#stopped, 0, 0), (#shutdown, 1, 0)]),
+    ([#stop 0, #ok], [(#stopped, 0, 0), (#shutdown, 2, 0)]),
+    ([#stop 0, #gap], [(#stopped, 0, 0), (#stopped, 0, 0)]),
+    ([#stop 0, #error], [(#stopped, 0, 0), (#stopped, 0, 0)]),
+    ([#stop 0, #stop 0], [(#stopped, 0, 0), (#shutdown, 1, 0)]),
   ];
   for (t in tests.vals()) {
     let (responses, statuses) = t;
@@ -408,22 +409,22 @@ do {
     ([#ok, #ok], [(#ready, 2, 2), (#ready, 2, 2)]),
     ([#ok, #gap], [(#paused, 0, 1), (#ready, 1, 1)]),
     ([#ok, #error], [(#paused, 0, 1), (#ready, 1, 1)]),
-    ([#ok, #stop], [(#stopped, 1, 1), (#stopped, 1, 1)]),
+    ([#ok, #stop 0], [(#stopped, 1, 1), (#stopped, 1, 1)]),
 
     ([#gap, #ok], [(#ready, 2, 2), (#shutdown, 2, 0)]),
     ([#gap, #gap], [(#paused, 0, 1), (#shutdown, 0, 0)]),
     ([#gap, #error], [(#paused, 0, 1), (#shutdown, 0, 0)]),
-    ([#gap, #stop], [(#stopped, 1, 1), (#shutdown, 1, 0)]),
+    ([#gap, #stop 0], [(#stopped, 1, 1), (#shutdown, 1, 0)]),
 
     ([#error, #ok], [(#ready, 2, 2), (#shutdown, 2, 0)]),
     ([#error, #gap], [(#paused, 0, 1), (#ready, 0, 0)]),
     ([#error, #error], [(#paused, 0, 1), (#ready, 0, 0)]),
-    ([#error, #stop], [(#stopped, 1, 1), (#shutdown, 1, 0)]),
+    ([#error, #stop 0], [(#stopped, 1, 1), (#shutdown, 1, 0)]),
 
-    ([#stop, #ok], [(#ready, 2, 2), (#shutdown, 2, 0)]),
-    ([#stop, #gap], [(#paused, 0, 1), (#stopped, 0, 0)]),
-    ([#stop, #error], [(#paused, 0, 1), (#stopped, 0, 0)]),
-    ([#stop, #stop], [(#stopped, 1, 1), (#shutdown, 1, 0)]),
+    ([#stop 0, #ok], [(#ready, 2, 2), (#shutdown, 2, 0)]),
+    ([#stop 0, #gap], [(#paused, 0, 1), (#stopped, 0, 0)]),
+    ([#stop 0, #error], [(#paused, 0, 1), (#stopped, 0, 0)]),
+    ([#stop 0, #stop 0], [(#stopped, 1, 1), (#shutdown, 1, 0)]),
   ];
   for (t in tests.vals()) {
     let (responses, statuses) = t;

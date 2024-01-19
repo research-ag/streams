@@ -80,10 +80,10 @@ module {
           lastRestartPos.set(pos);
         };
         case (_, #gap) gaps.add(1);
-        case (_, #stop) {
+        case (_, #stop i) {
           stops.add(1);
           stopFlag.update(1);
-          lastStopPos.set(pos);
+          lastStopPos.set(pos + i);
         };
       };
       let now = Prim.nat64ToNat(Prim.time() / 10 ** 6);
@@ -206,11 +206,11 @@ module {
       chunkErrorType.update(rejectCode);
     };
 
-    public func onResponse(res : { #ok; #gap; #stop; #error }) {
+    public func onResponse(res : Types.ControlMessage or { #error }) {
       switch (res) {
         case (#ok) oks.add(1);
         case (#gap) gaps.add(1);
-        case (#stop) stops.add(1);
+        case (#stop _) stops.add(1);
         case (#error) errors.add(1);
       };
       let ?s = sender_ else return;
