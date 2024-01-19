@@ -5,9 +5,8 @@ import StreamReceiver "../src/StreamReceiver";
 do {
   var size = 0;
   func process(index : Nat, item : Text) : Bool {
-    assert size == index;
     size += 1;
-    true;
+    size == index + 1;
   };
 
   let receiver = StreamReceiver.StreamReceiver<Text>(process, null);
@@ -28,9 +27,8 @@ do {
 do {
   var size = 0;
   func process(index : Nat, item : Text) : Bool {
-    assert size == index;
     size += 1;
-    true;
+    size == index + 1;
   };
 
   var time = 0;
