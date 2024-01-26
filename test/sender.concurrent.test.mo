@@ -25,6 +25,7 @@ class Chunk() {
     switch (response) {
       case (? #ok) #ok;
       case (? #gap) #gap;
+      case (? #timeout) #timeout;
       case (? #stop n) #stop n;
       case (? #error) throw Error.reject("");
       case (null) Debug.trap("cannot happen");

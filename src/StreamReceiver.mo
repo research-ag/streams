@@ -76,8 +76,9 @@ module {
     };
 
     /// Returns `#gap` if start position in ChunkMessage does not match internal length.
-    /// Returns `#stopped` if the receiver is already stopped or maximum waiting time between chunks is exceeded.
+    /// Returns `#timeout` if the receiver is already stopped or maximum waiting time between chunks is exceeded.
     /// Otherwise processes a chunk and call `itemCallback` on each item.
+    /// Returns `#stop i` if an item cannot be processed.
     /// A #ping message is handled equivalently to a #chunk of length zero.
     public func onChunk(cm : Types.ChunkMessage<T>) : Types.ControlMessage {
       let ret = processChunk(cm);
@@ -91,7 +92,7 @@ module {
       switch (msg) {
         case (#ping or #chunk _) {
           checkTimeAndStop();
-          if (stopped_) return #stop 0;
+          if (stopped_) return #timeout;
         };
         case (#restart) {
           resetTimeout();

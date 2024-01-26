@@ -24,5 +24,5 @@ module {
   };
 
   /// Return type of processing function.
-  public type ControlMessage = { #ok; #gap; #stop : Nat };
+  public type ControlMessage = { #ok; #gap; #timeout; #stop : Nat };
 };

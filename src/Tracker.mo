@@ -34,6 +34,7 @@ module {
     public let chunksOk = metrics.addCounter("stream_receiver_total_chunks_ok", labels, stable_);
     public let pingsOk = metrics.addCounter("stream_receiver_total_pings_ok", labels, stable_);
     public let gaps = metrics.addCounter("stream_receiver_total_gaps", labels, stable_);
+    public let timeouts = metrics.addCounter("stream_receiver_total_timeouts", labels, stable_);
     public let stops = metrics.addCounter("stream_receiver_total_stops", labels, stable_);
     public let restarts = metrics.addCounter("stream_receiver_total_restarts", labels, stable_);
     public let lastStopPos = metrics.addCounter("stream_receiver_last_stop_pos", labels, stable_);
@@ -55,6 +56,7 @@ module {
       chunksOk.remove();
       pingsOk.remove();
       gaps.remove();
+      timeouts.remove();
       stops.remove();
       restarts.remove();
       lastStopPos.remove();
@@ -80,6 +82,7 @@ module {
           lastRestartPos.set(pos);
         };
         case (_, #gap) gaps.add(1);
+        case (_, #timeout) timeouts.add(1);
         case (_, #stop i) {
           stops.add(1);
           stopFlag.update(1);
@@ -123,6 +126,7 @@ module {
     // on response
     public let oks = metrics.addCounter("stream_sender_total_oks", labels, stable_);
     public let gaps = metrics.addCounter("stream_sender_total_gaps", labels, stable_);
+    public let timeouts = metrics.addCounter("stream_sender_total_timeouts", labels, stable_);
     public let stops = metrics.addCounter("stream_sender_total_stops", labels, stable_);
     public let errors = metrics.addCounter("stream_sender_total_errors", labels, stable_);
     public let stopFlag = metrics.addGauge("stream_sender_stop_flag", labels, #both, [], stable_);
@@ -160,6 +164,7 @@ module {
       skips.remove();
       oks.remove();
       gaps.remove();
+      timeouts.remove();
       stops.remove();
       errors.remove();
       stopFlag.remove();
@@ -210,6 +215,7 @@ module {
       switch (res) {
         case (#ok) oks.add(1);
         case (#gap) gaps.add(1);
+        case (#timeout) timeouts.add(1);
         case (#stop _) stops.add(1);
         case (#error) errors.add(1);
       };

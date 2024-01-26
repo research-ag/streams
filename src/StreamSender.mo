@@ -234,6 +234,7 @@ module {
       switch (res) {
         case (#ok) okTo := end;
         case (#gap) { retraceTo := start; retraceMoreLater := true };
+        case (#timeout) { okTo := start; retraceTo := start };
         case (#stop l) { okTo := start + l; retraceTo := start + l };
         case (#error) if (start != end) retraceTo := start;
       };
@@ -263,14 +264,14 @@ module {
 
       // stop stream
       switch (res) {
-        case (#stop _) stopped := true;
+        case (#timeout or #stop _) stopped := true;
         case (_) {};
       };
 
       callbacks.onResponse(res);
     };
 
-    /// Restart the sender in case it's stopped after receiving `#stop` from `sendFunc`.
+    /// Restart the sender in case it's stopped after receiving `#timeout` or `#stop` from `sendFunc`.
     public func restart() : async Bool {
       if (shutdown or paused) return false;
       let res = try {
