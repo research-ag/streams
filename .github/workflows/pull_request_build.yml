@@ -4,28 +4,20 @@ on:
     types: [synchronize, opened, reopened, ready_for_review, unlabeled]
 
 env:
-  mops_version: latest
-  dfx_version: 0.15.3
+  dfx_version: 0.16.0
 
 jobs:
   build:
     runs-on: ubuntu-22.04
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+      - uses: ZenVoich/setup-mops@v1
 
-      - name: Make bin directory
-        run: mkdir -p /home/runner/bin
+      - name: make sure moc is installed
+        run: mops toolchain bin moc || mops toolchain use moc latest
 
-      - name: Install mops
-        run: |          
-          npm i -g ic-mops@${{ env.mops_version }}
-
-      - name: Install mops packages
-        run: mops install
-  
-      - name: Run test
+      - name: run tests
         run: mops test
 
       - name: Get dfx
