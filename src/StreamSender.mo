@@ -57,7 +57,7 @@ module {
     sendFunc : (x : Types.ChunkMessage<S>) -> async* Types.ControlMessage,
     counterCreator : () -> { accept(item : Q) : ?S },
   ) {
-    let buffer = SWB.SlidingWindowBuffer<Q>();
+    public let buffer = SWB.SlidingWindowBuffer<Q>();
 
     var stopped = false;
     var paused = false;
