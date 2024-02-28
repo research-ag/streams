@@ -3,14 +3,14 @@ name = "streams"
 version = "0.0.1"
 description = "Stream sender and receiver libraries"
 repository = "https://github.com/research-ag/streams"
-keywords = [ "stream sender", "stream receiver", "streams" ]
+keywords = [ "stream", "sender", "receiver", "batch", "concurrent" ]
 license = "Apache-2.0"
 
 [dependencies]
 base = "0.10.4"
 swb = "1.1.1"
 vector = "0.2.0"
-promtracker = "0.4.0"
+promtracker = "0.5.2"
 
 [dev-dependencies]
 test = "1.2.0"

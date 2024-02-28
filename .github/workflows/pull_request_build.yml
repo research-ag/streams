@@ -4,7 +4,7 @@ on:
     types: [synchronize, opened, reopened, ready_for_review, unlabeled]
 
 env:
-  dfx_version: 0.16.0
+  dfx_version: 0.17.0
 
 jobs:
   build:
@@ -22,9 +22,10 @@ jobs:
 
       - name: Get dfx
         run: |
-          DFX_VERSION=${{ env.dfx_version }} sh -ci "$(curl -fsSL https://internetcomputer.org/install.sh)"
+          DFX_VERSION=${{ env.dfx_version }} DFXVM_INIT_YES=true sh -ci "$(curl -fsSL https://internetcomputer.org/install.sh)"
 
       - name: Build examples
         working-directory: ./examples
         run: |
+          source "$HOME/.local/share/dfx/env"
           for dir in *; do (if [ -d "$dir" ]; then (cd "$dir" && dfx build --check) fi); done
