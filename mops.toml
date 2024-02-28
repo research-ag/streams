@@ -10,7 +10,7 @@ license = "Apache-2.0"
 base = "0.10.4"
 swb = "1.1.1"
 vector = "0.2.0"
-promtracker = "0.4.0"
+promtracker = "0.5.2"
 
 [dev-dependencies]
 test = "1.2.0"
