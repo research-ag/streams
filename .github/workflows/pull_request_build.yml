@@ -13,6 +13,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ZenVoich/setup-mops@v1
+      - uses: dfinity/setup-dfx@main
+
+      - name: Confirm dfx installation
+        run: dfx --version
 
       - name: make sure moc is installed
         run: mops toolchain bin moc || mops toolchain use moc latest
@@ -20,12 +24,6 @@ jobs:
       - name: run tests
         run: mops test
 
-      - name: Get dfx
-        run: |
-          DFX_VERSION=${{ env.dfx_version }} DFXVM_INIT_YES=true sh -ci "$(curl -fsSL https://internetcomputer.org/install.sh)"
-
       - name: Build examples
         working-directory: ./examples
-        run: |
-          source "$HOME/.local/share/dfx/env"
-          for dir in *; do (if [ -d "$dir" ]; then (cd "$dir" && dfx build --check) fi); done
+        run: for dir in *; do (if [ -d "$dir" ]; then (cd "$dir" && dfx build --check) fi); done
