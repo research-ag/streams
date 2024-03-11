@@ -7,13 +7,13 @@ keywords = [ "stream", "sender", "receiver", "batch", "concurrent" ]
 license = "Apache-2.0"
 
 [dependencies]
-base = "0.10.4"
+base = "0.11.0"
 swb = "1.1.1"
 vector = "0.2.0"
-promtracker = "0.5.2"
+promtracker = "0.5.3"
 
 [dev-dependencies]
 test = "1.2.0"
 
 [toolchain]
-moc = "0.10.4"
+moc = "0.11.0"

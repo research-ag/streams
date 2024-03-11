@@ -4,7 +4,7 @@ on:
     types: [synchronize, opened, reopened, ready_for_review, unlabeled]
 
 env:
-  dfx_version: 0.17.0
+  dfx_version: 0.18.0
 
 jobs:
   build:

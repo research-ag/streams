@@ -1,15 +1,34 @@
-# Streaming between canisters library
+# An ordered stream of messages between two canisters
 
 ## Overview
 
-Pair of `StreamSender`/`StreamRecevier` classes for streaming data between canisters. `StreamSender` receives items, queue then, forms chunks and them to the receiver side. `StreamReceiver` validates chunks and calls callback on each item.
+Suppose canister A wants to send canister B a stream of messages.
+The messages in the stream are ordered and should be processed by B in that order.
+This package provides an implementation of a protocol for this purpose.
+The protocol has the following properties:
 
-### Links
+* efficiency: messages from A are sent in batches to B
+* order: preservation of order is guaranteed
+* no gaps: messages are retried if needed to make sure there are no gaps in the stream
 
-The package is published on [MOPS](https://mops.one/...) and [GitHub](https://github.com/research-ag/...).
+The package provides two classes, `StreamSender` for A and `StreamReceiver` for B.
+In A, the canister code pushes items one by one to the StreamSender class.
+In B, the StreamReceiver class invokes a callback for each arrived item.
+The two classes manage everything in between including batching, 
+retries if any inter-canister calls fail and 
+managing concurrency (pipelining). 
+
+From the outside the protocol provides ordered, reliable messaging similar to TCP.
+The implementation is simler than TCP.
+For example, the only state maintained by the receiver is the stream position (a single integer).
+The receiver does not buffer later items that have arrived out of order.
+
+## Links
+
+The package is published on [MOPS](https://mops.one/stream) and [GitHub](https://github.com/research-ag/stream).
 Please refer to the README on GitHub where it renders properly with formulas and tables.
 
-The API documentation can be found [here](https://mops.one/.../docs/lib) on Mops.
+The API documentation can be found [here](https://mops.one/stream/docs/lib) on Mops.
 
 For updates, help, questions, feedback and other requests related to this package join us on:
 
@@ -17,9 +36,13 @@ For updates, help, questions, feedback and other requests related to this packag
 * [Twitter](https://twitter.com/mr_research_ag)
 * [Dfinity forum](https://forum.dfinity.org/)
 
-### Motivation
+## Motivation
 
-### Interface
+Reliable, asynchronous communication between canisters is hard to get right because of the many edge cases that can occur if inter-canisters calls fail.
+The purpose of this package is to hide that complexity from the developer
+by letting this library handle all of it.
+
+## Interface
 
 `StreamSender` requires such argements as:
 
@@ -54,19 +77,19 @@ Method `onChunk` should be called when receiving chunk from another canister.
 
 You need `mops` installed. In your project directory run:
 ```
-mops add streams
+mops add stream
 ```
 
 In the Motoko source file import the package as:
 ```
-import StreamSender "mo:streams/StreamSender";
-import StreamReceiver "mo:streams/StreamReceiver";
+import StreamSender "mo:stream/StreamSender";
+import StreamReceiver "mo:stream/StreamReceiver";
 ```
 
 ### Example of sender
 
 ```
-import Stream "mo:streams/StreamSender";
+import Stream "mo:stream/StreamSender";
 import Principal "mo:base/Principal";
 
 actor class Main(receiver : Principal) {
@@ -146,7 +169,7 @@ Suppose `<path-to-moc>` is the path of the `moc` binary of the appropriate versi
 
 Then run:
 ```
-git clone git@github.com:research-ag/streams.git
+git clone git@github.com:research-ag/stream.git
 mops install
 DFX_MOC_PATH=<path-to-moc> mops test
 ```
@@ -163,7 +186,7 @@ MR Research AG, 2023
 
 Main author: Timo Hanke (timohanke).
 
-Contributors: Timo Hanke (timohanke), Andrii Stepanov (AStepanov25).
+Contributors: Andrii Stepanov (AStepanov25), Andy Gura (AndyGura).
 
 ## License 
 
