@@ -1,5 +1,5 @@
 [dependencies]
-base = "0.10.4"
+base = "0.11.0"
 swb = "1.1.1"
 vector = "0.2.0"
-promtracker = "0.5.2"
+promtracker = "0.5.3"
