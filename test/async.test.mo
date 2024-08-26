@@ -2,7 +2,11 @@ import AsyncMethodTester "mo:mrr/AsyncMethodTester";
 import Array "mo:base/Array";
 import Iter "mo:base/Iter";
 import Result "mo:base/Result";
+import Nat32 "mo:base/Nat32";
+import Debug "mo:base/Debug";
+import Int "mo:base/Int";
 import StreamSender "../src/StreamSender";
+import StreamReceiver "../src/StreamReceiver";
 import Base "sender.base";
 
 type Item = (index : Nat, ?StreamSender.ControlMessage, StreamSender.Status, received : Nat, sent : Nat);
@@ -29,9 +33,7 @@ func test(sequence : [Item]) : async () {
   var result = Array.init<async ()>(n, async ());
 
   for (i in Iter.range(0, n - 1)) {
-    result[i] := async {
-      await* sender.sendChunk();
-    };
+    result[i] := async await* sender.sendChunk();
     await async ();
 
     assert sender.status() == #ready and sender.received() == 0 and sender.sent() == i + 1;
@@ -137,5 +139,155 @@ do {
       (1, responses[1], statuses[0].0, statuses[0].1, statuses[0].2),
       (0, responses[0], statuses[1].0, statuses[1].1, statuses[1].2),
     ]);
+  };
+};
+
+func allCases(n : Nat) : async () {
+  func next_permutation(p : [var Nat]) : Bool {
+    let n = p.size();
+
+    func swap(i : Nat, j : Nat) {
+      let x = p[i];
+      p[i] := p[j];
+      p[j] := x;
+    };
+
+    func reverse(from : Nat, to : Nat) {
+      var a = from;
+      var b = to;
+      while (a < b) {
+        swap(a, b);
+        a += 1;
+        b -= 1;
+      };
+    };
+
+    var point : ?Nat = null;
+    var i : Int = n - 2;
+    label l while (i >= 0) {
+      if (p[Int.abs(i)] < p[Int.abs(i + 1)]) {
+        point := ?Int.abs(i);
+        break l;
+      };
+      i -= 1;
+    };
+    switch (point) {
+      case (null) {
+        return false;
+      };
+      case (?x) {
+        var i : Int = n - 1;
+        label l while (i > x) {
+          if (p[Int.abs(i)] > p[x]) {
+            break l;
+          };
+          i -= 1;
+        };
+        swap(Int.abs(i), x);
+        reverse(x + 1, n - 1);
+      };
+    };
+    true;
+  };
+
+  type ChunkRequest = { #chunk; #ping };
+
+  func getResponses(a_ : Nat32, b_ : Nat32, c : Nat) : ([(?StreamSender.ControlMessage, ChunkRequest)], Nat) {
+    var time : Int = 0;
+    let r = StreamReceiver.StreamReceiver<()>(
+      func(pos : Nat, item : ()) = true,
+      ?(1, func() = time),
+    );
+    var x = 0;
+    let re = Array.tabulate<(?StreamSender.ControlMessage, ChunkRequest)>(
+      n,
+      func(i) {
+        let resp = if (Nat32.bittest(a_, i)) {
+          let m = if (Nat32.bittest(b_, i)) {
+            #chunk([()]);
+          } else {
+            #ping;
+          };
+          ?r.onChunk(x, m);
+        } else {
+          null;
+        };
+        let req = if (Nat32.bittest(b_, i)) {
+          x += 1;
+          #chunk;
+        } else {
+          #ping;
+        };
+        if (c == i) {
+          time := 100;
+        };
+        (resp, req);
+      },
+    );
+    (re, r.length());
+  };
+
+  func test(p : [var Nat], responses : [(?StreamSender.ControlMessage, ChunkRequest)], len : Nat) : async Bool {
+    var time = 0;
+
+    let mock = AsyncMethodTester.AsyncMethodTester<StreamSender.ChunkMessage<?Text>, (), StreamSender.ControlMessage>(null);
+
+    func sendChunkMessage(message : StreamSender.ChunkMessage<?Text>) : async* StreamSender.ControlMessage {
+      await* mock.call(message, null);
+      mock.call_result();
+    };
+
+    let s = StreamSender.StreamSender<Text, ?Text>(
+      sendChunkMessage,
+      Base.create(1),
+    );
+    s.setKeepAlive(?(1, func() = time));
+    s.setWindowSize(n + 1);
+
+    // let chunk = Array.tabulate<Chunk>(n, func(i) = Chunk());
+    var result = Array.init<async ()>(n, async ());
+
+    for (i in Iter.range(0, n - 1)) {
+      switch (responses[i].1) {
+        case (#chunk) {
+          Result.assertOk(s.push("a"));
+        };
+        case (#ping) {
+          time := (i + 1) * 2;
+        };
+      };
+      result[i] := async await* s.sendChunk();
+      await async ();
+    };
+
+    for (i in Iter.range(0, n - 1)) {
+      mock.release(p[i], ?responses[p[i]].0);
+      await result[p[i]];
+    };
+    s.status() != #shutdown and len == s.received();
+  };
+
+  let p = Array.tabulateVar<Nat>(n, func(i) = i);
+  label l loop {
+    for (i in Iter.range(0, 2 ** n - 1)) {
+      for (j in Iter.range(0, 2 ** n - 1)) {
+        for (time in Iter.range(0, n - 1)) {
+          let a = Nat32.fromNat(i);
+          let b = Nat32.fromNat(j);
+          let (r, l) = getResponses(a, b, time);
+          if (not (await test(p, r, l))) {
+            Debug.print(debug_show (p, i, j, time, r));
+            assert false;
+          };
+        };
+      };
+    };
+    if (not next_permutation(p)) break l;
+  };
+};
+
+do {
+  for (i in Iter.range(2, 3)) {
+    await allCases(i);
   };
 };
