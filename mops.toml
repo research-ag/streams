@@ -14,7 +14,7 @@ promtracker = "0.5.4"
 
 [dev-dependencies]
 test = "2.0.0"
-mrr = "https://github.com/research-ag/motoko-lib#5a3974a3563d039ddca9dbd3db2e744930551000"
+mrr = "https://github.com/research-ag/motoko-lib#89c8a0ac769a0ee6a4536ae09487b8757ade9542"
 
 [toolchain]
 moc = "0.11.0"

@@ -14,10 +14,10 @@ type Item = (index : Nat, ?StreamSender.ControlMessage, StreamSender.Status, rec
 func test(sequence : [Item]) : async () {
   let n = sequence.size();
 
-  let mock = AsyncMethodTester.AsyncMethodTester<StreamSender.ChunkMessage<?Text>, (), StreamSender.ControlMessage>(null);
+  let mock = AsyncMethodTester.ReleaseAsyncMethodTester<StreamSender.ControlMessage>(null);
 
-  func sendChunkMessage(message : StreamSender.ChunkMessage<?Text>) : async* StreamSender.ControlMessage {
-    await* mock.call(message, null);
+  func sendChunkMessage(_ : StreamSender.ChunkMessage<?Text>) : async* StreamSender.ControlMessage {
+    await mock.call();
     mock.call_result();
   };
 
@@ -230,10 +230,10 @@ func allCases(n : Nat) : async () {
   func test(p : [var Nat], responses : [(?StreamSender.ControlMessage, ChunkRequest)], len : Nat) : async Bool {
     var time = 0;
 
-    let mock = AsyncMethodTester.AsyncMethodTester<StreamSender.ChunkMessage<?Text>, (), StreamSender.ControlMessage>(null);
+    let mock = AsyncMethodTester.ReleaseAsyncMethodTester<StreamSender.ControlMessage>(null);
 
-    func sendChunkMessage(message : StreamSender.ChunkMessage<?Text>) : async* StreamSender.ControlMessage {
-      await* mock.call(message, null);
+    func sendChunkMessage(_ : StreamSender.ChunkMessage<?Text>) : async* StreamSender.ControlMessage {
+      await mock.call();
       mock.call_result();
     };
 
@@ -244,7 +244,6 @@ func allCases(n : Nat) : async () {
     s.setKeepAlive(?(1, func() = time));
     s.setWindowSize(n + 1);
 
-    // let chunk = Array.tabulate<Chunk>(n, func(i) = Chunk());
     var result = Array.init<async ()>(n, async ());
 
     for (i in Iter.range(0, n - 1)) {
