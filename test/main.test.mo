@@ -3,8 +3,6 @@ import StreamSender "../src/StreamSender";
 import { StreamReceiver = Receiver } "../src/StreamReceiver";
 import { StreamSender = Sender } "../src/StreamSender";
 import Buffer "mo:base/Buffer";
-import Error "mo:base/Error";
-import Time "mo:base/Time";
 import Debug "mo:base/Debug";
 import Nat "mo:base/Nat";
 import Result "mo:base/Result";

@@ -2,10 +2,8 @@ import StreamReceiver "../src/StreamReceiver";
 import StreamSender "../src/StreamSender";
 import Buffer "mo:base/Buffer";
 import Error "mo:base/Error";
-import Option "mo:base/Option";
 import Debug "mo:base/Debug";
 import Nat "mo:base/Nat";
-import Time "mo:base/Time";
 import Types "../src/types";
 
 // types for receiver actor
@@ -164,7 +162,7 @@ actor A {
     var str = "A submit: ";
     switch (res) {
       case (#ok i) str #= Nat.toText(i);
-      case (#err e) str #= "Error";
+      case (#err _) str #= "Error";
     };
     Debug.print(str);
     res;

@@ -3,11 +3,8 @@ import Types "../src/types";
 import Result "mo:base/Result";
 import Array "mo:base/Array";
 import Char "mo:base/Char";
-import Nat "mo:base/Nat";
 import Iter "mo:base/Iter";
 import Nat32 "mo:base/Nat32";
-import Debug "mo:base/Debug";
-import Error "mo:base/Error";
 import Base "sender.base";
 
 // sequential successful sends, chunk length = 1
@@ -69,7 +66,7 @@ do {
 
 // #stop response
 do {
-  func send(message : Types.ChunkMessage<?Text>) : async* Types.ControlMessage {
+  func send(_ : Types.ChunkMessage<?Text>) : async* Types.ControlMessage {
     #stop 0;
   };
 
@@ -84,7 +81,7 @@ do {
 
 // #gap response
 do {
-  func send(message : Types.ChunkMessage<?Text>) : async* Types.ControlMessage {
+  func send(_ : Types.ChunkMessage<?Text>) : async* Types.ControlMessage {
     #gap;
   };
 

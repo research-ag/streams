@@ -1,5 +1,4 @@
 import Nat "mo:base/Nat";
-import SWB "mo:swb";
 import Types "types";
 
 module {

@@ -1,10 +1,9 @@
-import Types "../src/types";
 import StreamReceiver "../src/StreamReceiver";
 
 // test index counter and gap detection
 do {
   var size = 0;
-  func process(index : Nat, item : Text) : Bool {
+  func process(index : Nat, _ : Text) : Bool {
     size += 1;
     size == index + 1;
   };
@@ -26,7 +25,7 @@ do {
 // test timeout detection
 do {
   var size = 0;
-  func process(index : Nat, item : Text) : Bool {
+  func process(index : Nat, _ : Text) : Bool {
     size += 1;
     size == index + 1;
   };

@@ -14,11 +14,10 @@ type Item = (index : Nat, ?StreamSender.ControlMessage, StreamSender.Status, rec
 func test(sequence : [Item]) : async () {
   let n = sequence.size();
 
-  let mock = AsyncMethodTester.ReleaseAsyncMethodTester<StreamSender.ControlMessage>(null);
+  let mock = AsyncMethodTester.ReleaseTester<StreamSender.ControlMessage>(null);
 
   func sendChunkMessage(_ : StreamSender.ChunkMessage<?Text>) : async* StreamSender.ControlMessage {
-    await mock.call();
-    mock.call_result();
+    mock.call_result(await* mock.call());
   };
 
   let sender = StreamSender.StreamSender<Text, ?Text>(
@@ -34,7 +33,7 @@ func test(sequence : [Item]) : async () {
 
   for (i in Iter.range(0, n - 1)) {
     result[i] := async await* sender.sendChunk();
-    await async ();
+    await* mock.wait(i);
 
     assert sender.status() == #ready and sender.received() == 0 and sender.sent() == i + 1;
   };
@@ -230,11 +229,10 @@ func allCases(n : Nat) : async () {
   func test(p : [var Nat], responses : [(?StreamSender.ControlMessage, ChunkRequest)], len : Nat) : async Bool {
     var time = 0;
 
-    let mock = AsyncMethodTester.ReleaseAsyncMethodTester<StreamSender.ControlMessage>(null);
+    let mock = AsyncMethodTester.ReleaseTester<StreamSender.ControlMessage>(null);
 
     func sendChunkMessage(_ : StreamSender.ChunkMessage<?Text>) : async* StreamSender.ControlMessage {
-      await mock.call();
-      mock.call_result();
+      mock.call_result(await* mock.call());
     };
 
     let s = StreamSender.StreamSender<Text, ?Text>(
@@ -256,7 +254,7 @@ func allCases(n : Nat) : async () {
         };
       };
       result[i] := async await* s.sendChunk();
-      await async ();
+      await* mock.wait(i);
     };
 
     for (i in Iter.range(0, n - 1)) {
@@ -298,11 +296,10 @@ type ItemA = ({ #send; #release : (Nat, ?StreamSender.ControlMessage) }, StreamS
 func _test_arbitrary(sequence : [ItemA]) : async () {
   let n = Iter.size(Iter.filter(sequence.vals(), func(a : ItemA) : Bool = a.0 == #send));
 
-  let mock = AsyncMethodTester.ReleaseAsyncMethodTester<StreamSender.ControlMessage>(null);
+  let mock = AsyncMethodTester.ReleaseTester<StreamSender.ControlMessage>(null);
 
   func sendChunkMessage(_ : StreamSender.ChunkMessage<?Text>) : async* StreamSender.ControlMessage {
-    await mock.call();
-    mock.call_result();
+    mock.call_result(await* mock.call());
   };
 
   let sender = StreamSender.StreamSender<Text, ?Text>(
@@ -321,7 +318,7 @@ func _test_arbitrary(sequence : [ItemA]) : async () {
     switch (command) {
       case (#send) {
         result[i] := async await* sender.sendChunk();
-        await async ();
+        await* mock.wait(i);
         i += 1;
       };
       case (#release(j, response)) {
@@ -337,11 +334,10 @@ func _test_arbitrary(sequence : [ItemA]) : async () {
 do {
   let N = StreamSender.MAX_CONCURRENT_CHUNKS_DEFAULT;
 
-  let mock = AsyncMethodTester.ReleaseAsyncMethodTester<StreamSender.ControlMessage>(null);
+  let mock = AsyncMethodTester.ReleaseTester<StreamSender.ControlMessage>(null);
 
   func sendChunkMessage(_ : StreamSender.ChunkMessage<?Text>) : async* StreamSender.ControlMessage {
-    await mock.call();
-    mock.call_result();
+    mock.call_result(await* mock.call());
   };
 
   let sender = StreamSender.StreamSender<Text, ?Text>(
@@ -357,12 +353,12 @@ do {
 
   for (i in Iter.range(0, N - 2)) {
     result[i] := async await* sender.sendChunk();
-    await async ();
+    await* mock.wait(i);
     assert sender.status() == #ready and sender.received() == 0 and sender.sent() == i + 1;
   };
 
   result[N - 1] := async await* sender.sendChunk();
-  await async ();
+  await* mock.wait(N - 1);
   assert sender.status() == #busy and sender.received() == 0 and sender.sent() == N;
 
   for (i in Iter.range(0, N - 1)) {
@@ -375,11 +371,10 @@ do {
 // Test lost #ping
 do {
   let n = 2;
-  let mock = AsyncMethodTester.ReleaseAsyncMethodTester<StreamSender.ControlMessage>(null);
+  let mock = AsyncMethodTester.ReleaseTester<StreamSender.ControlMessage>(null);
 
   func sendChunkMessage(_ : StreamSender.ChunkMessage<?Text>) : async* StreamSender.ControlMessage {
-    await mock.call();
-    mock.call_result();
+    mock.call_result(await* mock.call());
   };
 
   let sender = StreamSender.StreamSender<Text, ?Text>(
@@ -393,15 +388,13 @@ do {
 
   time := 2;
   result[0] := async await* sender.sendChunk();
-  await async ();
-
+  await* mock.wait(0);
   for (i in Iter.range(1, 3)) {
     Result.assertOk(sender.push("a"));
   };
 
   result[1] := async await* sender.sendChunk();
-  await async ();
-
+  await* mock.wait(1);
   mock.release(1, ? #ok);
   await result[1];
   assert sender.status() == #ready and sender.received() == 1 and sender.sent() == 1;
@@ -413,11 +406,10 @@ do {
 
 // Test swb rotation
 do {
-  let mock = AsyncMethodTester.ReleaseAsyncMethodTester<StreamSender.ControlMessage>(null);
+  let mock = AsyncMethodTester.ReleaseTester<StreamSender.ControlMessage>(null);
 
   func sendChunkMessage(_ : StreamSender.ChunkMessage<?Text>) : async* StreamSender.ControlMessage {
-    await mock.call();
-    mock.call_result();
+    mock.call_result(await* mock.call());
   };
 
   let sender = StreamSender.StreamSender<Text, ?Text>(
@@ -433,19 +425,19 @@ do {
   var result = Array.init<async ()>(n, async ());
 
   result[0] := async await* sender.sendChunk();
-  await async ();
+  await* mock.wait(0);
 
   result[1] := async await* sender.sendChunk();
-  await async ();
+  await* mock.wait(1);
 
   mock.release(1, ? #ok);
   await result[1];
   assert sender.status() == #ready and sender.received() == 2 and sender.sent() == 2;
 
   Result.assertOk(sender.push("a"));
-  
+
   result[2] := async await* sender.sendChunk();
-  await async ();
+  await* mock.wait(2);
 
   mock.release(2, null);
   await result[2];

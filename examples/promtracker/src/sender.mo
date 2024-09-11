@@ -2,8 +2,6 @@ import Stream "../../../src/StreamSender";
 import Tracker "../../../src/Tracker";
 import Principal "mo:base/Principal";
 import Result "mo:base/Result";
-import Debug "mo:base/Debug";
-import Array "mo:base/Array";
 import Text "mo:base/Text";
 import Time "mo:base/Time";
 import PT "mo:promtracker";
