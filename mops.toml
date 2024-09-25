@@ -7,15 +7,15 @@ keywords = [ "stream", "sender", "receiver", "batch", "concurrent" ]
 license = "Apache-2.0"
 
 [dependencies]
-base = "0.12.1"
+base = "0.13.0"
 swb = "1.2.0"
-vector = "0.4.0"
+vector = "0.4.1"
 promtracker = "0.5.4"
 
 [dev-dependencies]
 test = "2.0.0"
-mrr = "https://github.com/research-ag/motoko-lib#e98b6f4c4d80e596e98caad45c9936f68a26eb0c"
-async = "https://github.com/research-ag/await-async#dd50b92b7b455c6e3cc5ec136574461539a2d08a"
+mrr = "https://github.com/research-ag/motoko-lib#e98b6f4c4d80e596e98caad45c9936f68a26eb0c@e98b6f4c4d80e596e98caad45c9936f68a26eb0c"
+async = "https://github.com/research-ag/await-async#448b969d33639a2dd0959734a9b9f8edda0fb24b"
 
 [toolchain]
 moc = "0.11.1"
