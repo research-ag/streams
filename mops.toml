@@ -15,7 +15,7 @@ promtracker = "0.5.4"
 [dev-dependencies]
 test = "2.0.0"
 mrr = "https://github.com/research-ag/motoko-lib#e98b6f4c4d80e596e98caad45c9936f68a26eb0c@e98b6f4c4d80e596e98caad45c9936f68a26eb0c"
-async = "https://github.com/research-ag/await-async#448b969d33639a2dd0959734a9b9f8edda0fb24b"
+async = "https://github.com/research-ag/await-async#bc14a44e80043fd2737ddf796483094bdbab5975"
 
 [toolchain]
-moc = "0.11.1"
+moc = "0.13.0"
