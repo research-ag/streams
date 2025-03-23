@@ -180,7 +180,7 @@ DFX_MOC_PATH=<path-to-moc> mops test
 
 ## Copyright
 
-MR Research AG, 2023
+MR Research AG, 2023-2025
 
 ## Authors
 

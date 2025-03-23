@@ -1,13 +1,13 @@
 [package]
-name = "streams"
+name = "stream"
 version = "0.0.1"
 description = "Stream sender and receiver libraries"
 repository = "https://github.com/research-ag/streams"
-keywords = [ "stream", "sender", "receiver", "batch", "concurrent" ]
+keywords = [ "sender", "receiver", "batch", "concurrent", "order" ]
 license = "Apache-2.0"
 
 [dependencies]
-base = "0.13.0"
+base = "0.14.4"
 swb = "1.2.0"
 vector = "0.4.1"
 promtracker = "0.5.4"
