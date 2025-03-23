@@ -1,4 +1,4 @@
-import AsyncMethodTester "mo:async";
+import AsyncMethodTester "mo:async-test";
 import Array "mo:base/Array";
 import Iter "mo:base/Iter";
 import Result "mo:base/Result";

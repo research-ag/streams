@@ -14,7 +14,7 @@ promtracker = "0.5.4"
 
 [dev-dependencies]
 test = "2.0.0"
-async = "https://github.com/research-ag/await-async#bc14a44e80043fd2737ddf796483094bdbab5975"
+async-test = "0.0.1"
 
 [toolchain]
 moc = "0.13.0"
