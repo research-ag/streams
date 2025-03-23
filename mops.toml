@@ -2,7 +2,7 @@
 name = "stream"
 version = "0.0.1"
 description = "Stream sender and receiver libraries"
-repository = "https://github.com/research-ag/streams"
+repository = "https://github.com/research-ag/stream"
 keywords = [ "sender", "receiver", "batch", "concurrent", "order" ]
 license = "Apache-2.0"
 
@@ -14,8 +14,7 @@ promtracker = "0.5.4"
 
 [dev-dependencies]
 test = "2.0.0"
-mrr = "https://github.com/research-ag/motoko-lib#e98b6f4c4d80e596e98caad45c9936f68a26eb0c@e98b6f4c4d80e596e98caad45c9936f68a26eb0c"
-async = "https://github.com/research-ag/await-async#bc14a44e80043fd2737ddf796483094bdbab5975"
+async-test = "0.0.1"
 
 [toolchain]
 moc = "0.13.0"

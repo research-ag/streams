@@ -1,3 +1,6 @@
+[![mops](https://oknww-riaaa-aaaam-qaf6a-cai.raw.ic0.app/badge/mops/stream)](https://mops.one/stream)
+[![documentation](https://oknww-riaaa-aaaam-qaf6a-cai.raw.ic0.app/badge/documentation/stream)](https://mops.one/stream/docs)
+
 # An ordered stream of messages between two canisters
 
 ## Overview
@@ -135,7 +138,7 @@ actor class Main(receiver : Principal) {
 ### Example of receiver
 
 ```
-import Stream "mo:streams/StreamReceiver";
+import Stream "mo:stream/StreamReceiver";
 import Error "mo:base/Error";
 
 actor class Main(sender : Principal) {
